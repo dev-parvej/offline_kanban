@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dev-parvej/offline_kanban/pkg/util"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -127,5 +128,5 @@ func (d *Database) ValidateUser(username, password string) (bool, bool, error) {
 		return false, false, err
 	}
 
-	return storedPassword == password, isRoot, nil // Note: In production, use proper password comparison
+	return util.ComparePassword(storedPassword, password), isRoot, nil
 }

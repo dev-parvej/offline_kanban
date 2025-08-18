@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dev-parvej/offline_kanban/pkg/database"
+	"github.com/dev-parvej/offline_kanban/pkg/util"
 )
 
 // App struct
@@ -45,7 +46,8 @@ func (a *App) IsSetupComplete() bool {
 
 // SetupRoot creates the root user during first run
 func (a *App) SetupRoot(username, password string) error {
-	return a.db.CreateRootUser(username, password)
+	hashed, _ := util.HashPassword(password)
+	return a.db.CreateRootUser(username, hashed)
 }
 
 // Login validates user credentials

@@ -1,0 +1,11 @@
+{
+    "sqltools.useNodeRuntime": true,
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "offline-kanban",
+            "database": "${workspaceFolder:wails-react-learning}/db/app.db"
+        }
+    ]
+}
