@@ -1,9 +1,28 @@
-import React, { useState } from 'react';
+import {useEffect, useState} from 'react';
 import Container from './components/UI/Gird/Container';
 import { Kanban } from 'react-kanban-kit';
-import { IsSetupComplete, SetupRoot, AddUser, Login } from '../wailsjs/go/main/App'
+import {Modal} from "./components/UI/Modal";
+import {IsSetupComplete} from "../wailsjs/go/main/App"
+import {RootUserForm} from "./View/RootUserForm";
 
 function App() {
+
+     const [showSetupModal, setShowSetupModal] = useState(false)
+
+    useEffect(() => {
+        const checkSetup = async () => {
+            const isSetupComplete = await IsSetupComplete();
+
+            if (!isSetupComplete) {
+                setShowSetupModal(true);
+            } else {
+                setShowSetupModal(false);
+            }
+        };
+        checkSetup();
+    }, [setShowSetupModal, IsSetupComplete, showSetupModal]);
+
+
   const [dataSource, setDataSource] = useState({
     root: {
       id: "root",
@@ -70,7 +89,7 @@ function App() {
       type: "card",
     },
   });
-   
+
 
  const configMap = {
     card: {
@@ -93,6 +112,9 @@ function App() {
 
   return (
     <Container isFluid>
+        <Modal isOpen={showSetupModal} onClose={() => setShowSetupModal(false)} >
+            <RootUserForm rootSaved={ () => setShowSetupModal(false) } />
+        </Modal>
        <Kanban
         dataSource={dataSource}
         configMap={configMap}
