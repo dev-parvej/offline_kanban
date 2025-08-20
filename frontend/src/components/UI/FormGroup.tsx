@@ -5,17 +5,29 @@ type FormGroupProps = {
   htmlFor?: string;
   children: React.ReactNode;
   className?: string;
-  errorMessage?: string
+  errorMessage?: string;
+  isDarkMode?: boolean;
 };
 
-const FormGroup = ({ label, htmlFor, children, errorMessage, className = '' }: FormGroupProps) => {
+const FormGroup = ({ label, htmlFor, children, errorMessage, className = '', isDarkMode = false }: FormGroupProps) => {
   return (
     <div className={`mb-4 ${className}`}>
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
+      <label 
+        htmlFor={htmlFor} 
+        className={`block text-sm font-medium mb-1 ${
+          isDarkMode ? 'text-gray-200' : 'text-gray-700'
+        }`}
+      >
         {label}
       </label>
       {children}
-      {errorMessage && <span className="text-red-500 text-sm">{errorMessage}</span>}
+      {errorMessage && (
+        <span className={`text-sm ${
+          isDarkMode ? 'text-red-400' : 'text-red-500'
+        }`}>
+          {errorMessage}
+        </span>
+      )}
     </div>
   );
 };
