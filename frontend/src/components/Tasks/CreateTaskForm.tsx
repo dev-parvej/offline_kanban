@@ -6,10 +6,18 @@ import { Button } from '../ui/Button';
 import { useToast } from '../../hook';
 import RichTextEditor from '../ui/RichTextEditor';
 import { useTheme } from '../../contexts/ThemeContext';
+import { TaskChecklist } from './TaskChecklist';
 
 interface CreateTaskFormProps {
   onClose: () => void;
   onSubmit: (taskData: any) => void;
+}
+
+interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  order: number;
 }
 
 export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ 
@@ -17,6 +25,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
   onSubmit 
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const { showToast, ToastContainer } = useToast();
   const { register, handleSubmit, control, formState: { errors } } = useForm();
   const { isDarkMode } = useTheme();
@@ -34,6 +43,22 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
     { value: 'urgent', label: 'Urgent' }
   ];
 
+  // Mock users - will be replaced with API call
+  const users = [
+    { id: '1', name: 'John Smith', email: 'john@example.com' },
+    { id: '2', name: 'Sarah Johnson', email: 'sarah@example.com' },
+    { id: '3', name: 'Michael Brown', email: 'michael@example.com' },
+    { id: '4', name: 'Emily Davis', email: 'emily@example.com' }
+  ];
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase())
+      .join('')
+      .substring(0, 2);
+  };
+
   const saveTask = async (data: FieldValues) => {
     setIsLoading(true);
     try {
@@ -43,11 +68,16 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
         content: data.content || '',
         priority: data.priority,
         columnId: data.columnId,
+        assignee: data.assignee || null,
+        checklist: checklistItems,
         autoArchiveDays: data.autoArchiveDays ? parseInt(data.autoArchiveDays) : undefined
       };
       
       await onSubmit(taskData);
       showToast("Task created successfully!", "success");
+      
+      // Reset form and checklist
+      setChecklistItems([]);
       onClose();
     } catch (error) {
       console.error("Error creating task:", error);
@@ -118,6 +148,25 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
           )}
         </FormGroup>
 
+        {/* Assignee Field */}
+        <FormGroup label="Assignee">
+          <select
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            {...register("assignee")}
+            defaultValue=""
+          >
+            <option value="">Unassigned</option>
+            {users.map(user => (
+              <option key={user.id} value={user.id}>
+                {user.name} ({user.email})
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Assign this task to a team member. Leave empty for unassigned tasks.
+          </p>
+        </FormGroup>
+
         {/* Priority and Column Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
@@ -177,6 +226,16 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Task will be automatically archived after the specified number of days. Leave empty for permanent tasks.
           </p>
+        </FormGroup>
+
+        {/* Checklist Field */}
+        <FormGroup label="Task Checklist">
+          <TaskChecklist
+            items={checklistItems}
+            onChange={setChecklistItems}
+            editable={true}
+            showProgress={false}
+          />
         </FormGroup>
 
         {/* Action Buttons */}
