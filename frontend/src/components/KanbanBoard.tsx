@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Kanban } from 'react-kanban-kit';
+import { useTheme } from '../contexts/ThemeContext';
 
-interface KanbanBoardProps {
-  isDarkMode: boolean;
-}
-
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ isDarkMode }) => {
+export const KanbanBoard: React.FC = () => {
+  const { isDarkMode } = useTheme();
+  
   const [dataSource, setDataSource] = useState({
     root: {
       id: "root",
@@ -76,14 +75,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ isDarkMode }) => {
   const configMap = {
     card: {
       render: ({ data, column, index, isDraggable }: any) => (
-        <div className={`kanban-card p-4 rounded-lg shadow-sm border transition-colors ${
-          isDarkMode 
-            ? 'bg-gray-800 border-gray-600 text-white' 
-            : 'bg-white border-gray-200 text-gray-900'
-        }`}>
+        <div className="kanban-card p-4 rounded-lg shadow-sm border transition-colors bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white">
           <h3 className="font-semibold mb-2">{data.title}</h3>
           {data.content?.description && (
-            <p className={`text-sm mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            <p className="text-sm mb-3 text-gray-600 dark:text-gray-300">
               {data.content.description}
             </p>
           )}
@@ -91,10 +86,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ isDarkMode }) => {
             {data.content?.priority && (
               <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                 data.content.priority === 'high' 
-                  ? 'bg-red-100 text-red-800' 
+                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
                   : data.content.priority === 'medium'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-green-100 text-green-800'
+                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
               }`}>
                 {data.content.priority}
               </span>
@@ -114,6 +109,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ isDarkMode }) => {
   const columnStyle = {
     backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb',
     border: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+    color: isDarkMode ? '#ffffff' : '#000000',
   };
 
   return (

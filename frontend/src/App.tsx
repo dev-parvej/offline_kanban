@@ -5,7 +5,7 @@ import {Modal} from "./components/ui/Modal";
 import {IsSetupComplete} from "../wailsjs/go/main/App"
 import {RootUserForm} from "./View/RootUserForm";
 import { Navbar } from './components/ui/Navbar/Navbar';
-import { useDarkMode } from './hooks/useDarkMode';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Dashboard } from './pages/Dashboard';
 import { Tasks } from './pages/Tasks';
 import { Users } from './pages/Users';
@@ -14,7 +14,6 @@ import { Settings } from './pages/Settings';
 // Component to handle navigation and active states
 function AppContent() {
   const location = useLocation();
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
   
   const getMenuItems = () => [
     { label: 'Board', href: '/', active: location.pathname === '/' },
@@ -24,18 +23,14 @@ function AppContent() {
   ];
 
   return (
-    <div className={isDarkMode ? 'dark bg-gray-900 min-h-screen' : 'bg-white min-h-screen'}>
-      <Navbar 
-        menuItems={getMenuItems()}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={toggleDarkMode}
-      />
+    <div className="bg-white dark:bg-gray-900 min-h-screen">
+      <Navbar menuItems={getMenuItems()} />
       <Container isFluid>
         <Routes>
-          <Route path="/" element={<Dashboard isDarkMode={isDarkMode} />} />
-          <Route path="/tasks" element={<Tasks isDarkMode={isDarkMode} />} />
-          <Route path="/users" element={<Users isDarkMode={isDarkMode} />} />
-          <Route path="/settings" element={<Settings isDarkMode={isDarkMode} />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Container>
     </div>
@@ -60,10 +55,12 @@ function App() {
 
   return (
     <Router>
-      <Modal isOpen={showSetupModal} onClose={() => setShowSetupModal(false)}>
-        <RootUserForm rootSaved={() => setShowSetupModal(false)} />
-      </Modal>
-      <AppContent />
+      <ThemeProvider>
+        <Modal isOpen={showSetupModal} onClose={() => setShowSetupModal(false)}>
+          <RootUserForm rootSaved={() => setShowSetupModal(false)} />
+        </Modal>
+        <AppContent />
+      </ThemeProvider>
     </Router>
   );
 }

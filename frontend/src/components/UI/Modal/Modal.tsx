@@ -8,10 +8,9 @@ type ModalProps = {
   onClose: () => void;
   children: React.ReactNode;
   className?: string;
-  isDarkMode?: boolean;
 };
 
-export const Modal = ({ isOpen, onClose, children, className = '', isDarkMode = false }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, children, className = '' }: ModalProps) => {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -36,7 +35,7 @@ export const Modal = ({ isOpen, onClose, children, className = '', isDarkMode = 
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className={`absolute inset-0 z-0 ${isDarkMode ? 'bg-black/70' : 'bg-black/50'}`} 
+        className="absolute inset-0 z-0 bg-black/50 dark:bg-black/70" 
         onClick={onClose} 
       />
 
@@ -44,20 +43,14 @@ export const Modal = ({ isOpen, onClose, children, className = '', isDarkMode = 
       <div
         className={classNames(
           'relative z-10 rounded-lg shadow-lg max-w-md w-full p-6',
-          isDarkMode 
-            ? 'bg-gray-800 text-white' 
-            : 'bg-white text-gray-900',
+          'bg-white text-gray-900 dark:bg-gray-800 dark:text-white',
           className
         )}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className={`absolute top-3 right-3 transition-colors ${
-            isDarkMode 
-              ? 'text-gray-400 hover:text-gray-200' 
-              : 'text-gray-400 hover:text-gray-600'
-          }`}
+          className="absolute top-3 right-3 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           aria-label="Close Modal"
         >
           ✕

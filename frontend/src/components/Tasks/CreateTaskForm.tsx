@@ -6,13 +6,11 @@ import { Button } from '../ui/Button';
 import { useToast } from '../../hook';
 
 interface CreateTaskFormProps {
-  isDarkMode: boolean;
   onClose: () => void;
   onSubmit: (taskData: any) => void;
 }
 
 export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({ 
-  isDarkMode, 
   onClose, 
   onSubmit 
 }) => {
@@ -57,13 +55,13 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
   };
 
   return (
-    <div className={`p-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className="p-6 text-gray-900 dark:text-white">
       {/* Header */}
       <div className="mb-6">
-        <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Create New Task
         </h2>
-        <p className={`mt-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
           Add a new task to your Kanban board
         </p>
       </div>
@@ -72,10 +70,9 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
       <form onSubmit={handleSubmit(saveTask)} className="flex flex-col gap-4">
         
         {/* Title Field */}
-        <FormGroup label="Title" errorMessage={errors.title?.message as string} isDarkMode={isDarkMode}>
+        <FormGroup label="Title" errorMessage={errors.title?.message as string}>
           <Input 
             placeholder="Enter task title..."
-            isDarkMode={isDarkMode}
             {...register("title", { 
               required: "Title is required", 
               minLength: {
@@ -91,15 +88,11 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
         </FormGroup>
 
         {/* Content Field */}
-        <FormGroup label="Description" isDarkMode={isDarkMode}>
+        <FormGroup label="Description">
           <textarea
             placeholder="Enter task description..."
             rows={4}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors ${
-              isDarkMode 
-                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-            }`}
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors bg-white border-gray-300 text-gray-900 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
             {...register("content", {
               maxLength: {
                 value: 1000,
@@ -108,7 +101,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
             })}
           />
           {errors.content && (
-            <span className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
+            <span className="text-sm text-red-500 dark:text-red-400">
               {errors.content.message as string}
             </span>
           )}
@@ -118,13 +111,9 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
           {/* Priority Field */}
-          <FormGroup label="Priority" isDarkMode={isDarkMode}>
+          <FormGroup label="Priority">
             <select
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-white' 
-                  : 'bg-white border-gray-300 text-gray-900'
-              }`}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               {...register("priority", { required: "Priority is required" })}
               defaultValue="medium"
             >
@@ -135,20 +124,16 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
               ))}
             </select>
             {errors.priority && (
-              <span className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
+              <span className="text-sm text-red-500 dark:text-red-400">
                 {errors.priority.message as string}
               </span>
             )}
           </FormGroup>
 
           {/* Column Field */}
-          <FormGroup label="Column" errorMessage={errors.columnId?.message as string} isDarkMode={isDarkMode}>
+          <FormGroup label="Column" errorMessage={errors.columnId?.message as string}>
             <select
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-white' 
-                  : 'bg-white border-gray-300 text-gray-900'
-              }`}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               {...register("columnId", { required: "Please select a column" })}
               defaultValue="col-1"
             >
@@ -162,12 +147,11 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
         </div>
 
         {/* Auto-archive Field */}
-        <FormGroup label="Auto-archive after (days)" errorMessage={errors.autoArchiveDays?.message as string} isDarkMode={isDarkMode}>
+        <FormGroup label="Auto-archive after (days)" errorMessage={errors.autoArchiveDays?.message as string}>
           <Input
             type="number"
             placeholder="Leave empty to never auto-archive"
             min="1"
-            isDarkMode={isDarkMode}
             {...register("autoArchiveDays", {
               min: {
                 value: 1,
@@ -179,7 +163,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
               }
             })}
           />
-          <p className={`mt-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Task will be automatically archived after the specified number of days. Leave empty for permanent tasks.
           </p>
         </FormGroup>
@@ -189,11 +173,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              isDarkMode 
-                ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
-                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
-            }`}
+            className="px-4 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
           >
             Cancel
           </button>

@@ -1,24 +1,20 @@
 import React from 'react';
 
-interface SettingsProps {
-  isDarkMode: boolean;
-}
-
-export const Settings: React.FC<SettingsProps> = ({ isDarkMode }) => {
+export const Settings: React.FC = () => {
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Settings
           </h1>
-          <p className={`mt-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             Application configuration and preferences
           </p>
         </div>
-        <div className={`mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`}>
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow rounded-lg p-6`}>
-            <p className={`text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+        <div className="mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <p className="text-center text-gray-600 dark:text-gray-300">
               Settings panel coming soon...
             </p>
           </div>
