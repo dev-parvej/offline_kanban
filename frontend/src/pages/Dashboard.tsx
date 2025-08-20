@@ -45,7 +45,7 @@ export const Dashboard: React.FC = () => {
       <Modal 
         isOpen={showCreateTaskModal} 
         onClose={() => setShowCreateTaskModal(false)}
-        className="max-w-2xl"
+        className="max-w-4xl lg:max-w-5xl xl:max-w-6xl w-full"
       >
         <CreateTaskForm 
           onClose={() => setShowCreateTaskModal(false)}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../../../contexts/ThemeContext';
+import Container from '../Gird/Container';
 
 interface MenuItem {
   label: string;
@@ -25,8 +26,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav className={`bg-white border-gray-200 dark:bg-gray-900 dark:border-gray-700 shadow-sm border-b ${className}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <Container isFluid>
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
           {/* Brand/Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -96,6 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
+      </Container>
 
       {/* Mobile Menu */}
       {isOpen && (

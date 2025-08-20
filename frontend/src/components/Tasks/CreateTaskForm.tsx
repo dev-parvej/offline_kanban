@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { useForm, FieldValues } from 'react-hook-form';
+import { useForm, FieldValues, Controller } from 'react-hook-form';
 import FormGroup from '../ui/FormGroup';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hook';
+import RichTextEditor from '../ui/RichTextEditor';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CreateTaskFormProps {
   onClose: () => void;
@@ -16,7 +18,8 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { showToast, ToastContainer } = useToast();
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, control, formState: { errors } } = useForm();
+  const { isDarkMode } = useTheme();
 
   const columns = [
     { id: 'col-1', name: 'To Do' },
@@ -55,7 +58,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
   };
 
   return (
-    <div className="p-6 text-gray-900 dark:text-white">
+    <div className="text-gray-900 dark:text-white">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -89,16 +92,24 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
 
         {/* Content Field */}
         <FormGroup label="Description">
-          <textarea
-            placeholder="Enter task description..."
-            rows={4}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors bg-white border-gray-300 text-gray-900 placeholder-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-            {...register("content", {
+          <Controller
+            name="content"
+            control={control}
+            defaultValue=""
+            rules={{
               maxLength: {
                 value: 1000,
                 message: "Description must not exceed 1000 characters"
               }
-            })}
+            }}
+            render={({ field }) => (
+              <RichTextEditor
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Enter task description..."
+                isDarkMode={isDarkMode}
+              />
+            )}
           />
           {errors.content && (
             <span className="text-sm text-red-500 dark:text-red-400">

@@ -42,7 +42,7 @@ export const Modal = ({ isOpen, onClose, children, className = '' }: ModalProps)
       {/* Modal Content */}
       <div
         className={classNames(
-          'relative z-10 rounded-lg shadow-lg max-w-md w-full p-6',
+          'relative z-10 rounded-lg shadow-lg max-w-md w-full mx-4',
           'bg-white text-gray-900 dark:bg-gray-800 dark:text-white',
           className
         )}
@@ -50,13 +50,15 @@ export const Modal = ({ isOpen, onClose, children, className = '' }: ModalProps)
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          className="absolute top-4 right-4 z-10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           aria-label="Close Modal"
         >
           ✕
         </button>
 
-        {children}
+        <div className="p-6">
+          {children}
+        </div>
       </div>
     </div>
   );
