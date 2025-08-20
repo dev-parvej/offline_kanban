@@ -34,7 +34,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             const range = quill.getSelection();
             const index = range ? range.index : quill.getLength();
             quill.insertEmbed(index, 'image', reader.result, 'user');
-            quill.setSelection(index + 1);
+            quill.setSelection(index + 1 as any);
           }
         };
         reader.readAsDataURL(file);
@@ -76,7 +76,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           backgroundColor: isDarkMode ? '#374151' : '#ffffff',
         }}
       />
-      <style jsx>{`
+      <style>{`
         .rich-text-editor.dark-mode .ql-toolbar {
           border-color: #4b5563;
           background-color: #374151;
