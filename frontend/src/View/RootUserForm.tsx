@@ -1,6 +1,6 @@
-import FormGroup from "../components/UI/FormGroup";
-import {Input} from "../components/UI/Input";
-import {Button} from "../components/UI/Button";
+import FormGroup from "../components/ui/FormGroup";
+import {Input} from "../components/ui/Input";
+import {Button} from "../components/ui/Button";
 import {useState} from "react";
 import { SetupRoot } from "../../wailsjs/go/main/App";
 import { useToast } from "../hook";

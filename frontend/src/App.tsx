@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
-import Container from './components/UI/Gird/Container';
+import Container from './components/ui/Gird/Container';
 import { Kanban } from 'react-kanban-kit';
-import {Modal} from "./components/UI/Modal";
+import {Modal} from "./components/ui/Modal";
 import {IsSetupComplete} from "../wailsjs/go/main/App"
 import {RootUserForm} from "./View/RootUserForm";
 
