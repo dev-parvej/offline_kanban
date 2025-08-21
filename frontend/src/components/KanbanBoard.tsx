@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Kanban } from 'react-kanban-kit';
 import { useTheme } from '../contexts/ThemeContext';
+import { TaskDetailsModal } from './Tasks/TaskDetailsModal';
 
 export const KanbanBoard: React.FC = () => {
   const { isDarkMode } = useTheme();
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   
   const [dataSource, setDataSource] = useState({
     root: {
@@ -119,7 +122,8 @@ export const KanbanBoard: React.FC = () => {
         configMap={configMap}
         columnWrapperStyle={() => columnStyle}
         onCardClick={(_, card) => {
-          // Handle card click
+          setSelectedTask(card);
+          setIsTaskDetailsOpen(true);
         }}
         onCardMove={(move) => {
           if (Object.hasOwn(dataSource, move.toColumnId)) {
@@ -143,6 +147,15 @@ export const KanbanBoard: React.FC = () => {
           console.log("Column moved:", move);
           // Handle column reordering
         }}
+      />
+      
+      <TaskDetailsModal
+        isOpen={isTaskDetailsOpen}
+        onClose={() => {
+          setIsTaskDetailsOpen(false);
+          setSelectedTask(null);
+        }}
+        task={selectedTask}
       />
     </div>
   );
