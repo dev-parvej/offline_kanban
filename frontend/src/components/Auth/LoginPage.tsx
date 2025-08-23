@@ -6,6 +6,7 @@ import { useToast } from '../../hook';
 import FormGroup from '../ui/FormGroup';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginFormData {
   username: string;
@@ -17,6 +18,7 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { isDarkMode } = useTheme();
   const { showToast, ToastContainer } = useToast();
+  const navigate = useNavigate();
   
   const { 
     register, 
@@ -30,6 +32,7 @@ export const LoginPage: React.FC = () => {
     try {
       await login(data);
       showToast('Login successful!', 'success');
+      navigate("/")
     } catch (error: any) {
       showToast(error.message || 'Login failed', 'error');
     } finally {
@@ -46,14 +49,7 @@ export const LoginPage: React.FC = () => {
       }`}>
         
         {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 mb-4">
-            <img 
-              src="/logo-universal.png" 
-              alt="Kanban Logo" 
-              className="w-full h-full object-contain"
-            />
-          </div>
+        <div className="text-center pt-5">
           <h2 className={`text-3xl font-bold ${
             isDarkMode ? 'text-white' : 'text-gray-900'
           }`}>
@@ -100,7 +96,7 @@ export const LoginPage: React.FC = () => {
               {...register('password', {
                 required: 'Password is required',
                 minLength: {
-                  value: 6,
+                  value: 4,
                   message: 'Password must be at least 6 characters'
                 }
               })}

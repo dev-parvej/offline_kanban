@@ -1,9 +1,21 @@
 package dto
 
+import (
+	"github.com/dev-parvej/offline_kanban/pkg/util"
+)
+
 type LoginResponseDto struct {
 	User         UserDto `json:"user"`
 	AccessToken  string  `json:"access_token"`
 	RefreshToken string  `json:"refresh_token"`
+}
+
+func NewLoginResponse() *LoginResponseDto {
+	return &LoginResponseDto{}
+}
+
+func (loginResponse *LoginResponseDto) Create(data map[string]interface{}) *LoginResponseDto {
+	return util.FillStruct(loginResponse, data)
 }
 
 type UserDto struct {

@@ -121,7 +121,7 @@ class AuthService {
   // Update user profile
   async updateProfile(updates: Partial<User>): Promise<User> {
     try {
-      const response = await api.put<{ user: User }>('/auth/profile', updates);
+      const response = await api.put<{ user: User }>('/auth/user/profile', updates);
       
       const user = response.data.user;
       
@@ -138,7 +138,7 @@ class AuthService {
   // Change password
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     try {
-      await api.post('/auth/change-password', {
+      await api.post('/auth/user/change-password', {
         current_password: currentPassword,
         new_password: newPassword
       });

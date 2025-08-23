@@ -110,16 +110,15 @@ func (ur *UserRepository) Create(username, hashedPassword string, name, designat
 }
 
 // Update user profile
-func (ur *UserRepository) UpdateProfile(id int, name, username, designation *string) (*User, error) {
+func (ur *UserRepository) UpdateProfile(id int, name, designation *string) (*User, error) {
 	query := `
 		UPDATE users 
 		SET name = COALESCE(?, name),
-		    username = COALESCE(?, username),
 		    designation = COALESCE(?, designation),
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND is_active = 1`
 
-	_, err := ur.db.Instance().Exec(query, name, username, designation, id)
+	_, err := ur.db.Instance().Exec(query, name, designation, id)
 	if err != nil {
 		return nil, err
 	}

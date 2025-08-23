@@ -58,3 +58,10 @@ func CopyMap(from map[string]interface{}, to map[string]interface{}) map[string]
 
 	return to
 }
+
+func FillStruct[T interface{}](s T, data map[string]interface{}) T {
+	b, _ := json.Marshal(data)
+	json.Unmarshal(b, s)
+
+	return s
+}

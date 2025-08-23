@@ -15,7 +15,7 @@ type Column struct {
 	Colors    *string   `json:"colors"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	
+
 	// Related data (loaded separately)
 	CreatedByUser *User `json:"created_by_user,omitempty"`
 	TaskCount     int   `json:"task_count,omitempty"`
@@ -93,7 +93,7 @@ func (cr *ColumnRepository) Update(id int, title *string, colors *string) (*Colu
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	if rowsAffected == 0 {
@@ -115,7 +115,7 @@ func (cr *ColumnRepository) Delete(id int) error {
 	}
 
 	query := `DELETE FROM columns WHERE id = ?`
-	
+
 	result, err := cr.db.Instance().Exec(query, id)
 	if err != nil {
 		return err
@@ -302,7 +302,7 @@ func (cr *ColumnRepository) Reorder(columnIDs []int) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Log the intended order (position i+1)
 		// In a real implementation, you'd update an order_position field
 		_ = i + 1 // Position for this column

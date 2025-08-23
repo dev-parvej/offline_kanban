@@ -1,20 +1,21 @@
-// Cookie utility functions for JWT token management
-
 export const setCookie = (name: string, value: string, days: number = 7): void => {
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict;Secure=${window.location.protocol === 'https:'}`;
+
+  let cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+
+  if (window.location.protocol === "https:") {
+    cookie += ";Secure"; // just the flag, no value
+  }
+
+  document.cookie = cookie;
 };
 
+
 export const getCookie = (name: string): string | null => {
-  const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-  }
-  return null;
+  const cookies = document.cookie.split(";").map(c => c.trim());
+  const cookie = cookies.find(c => c.startsWith(name + "="));
+  return cookie ? cookie.substring(name.length + 1) : null;
 };
 
 export const deleteCookie = (name: string): void => {

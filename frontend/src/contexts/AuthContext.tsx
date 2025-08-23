@@ -41,7 +41,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (verifiedUser) {
           setUser(verifiedUser);
         } else {
-          // Session invalid, clear local data
           setUser(null);
         }
       }
