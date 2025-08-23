@@ -17,6 +17,7 @@ func SetUpGorilaMuxServer(db *database.Database) http.Handler {
 	router := mux.NewRouter()
 
 	controller.SetupController(router, db).Router()
+	controller.AuthController(router, db).Router()
 
 	// Example root API route
 	if isDev() {
@@ -34,7 +35,7 @@ func SetUpGorilaMuxServer(db *database.Database) http.Handler {
 	cors := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"}),
-		handlers.AllowedHeaders([]string{"*"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization", "X-Requested-With"}),
 	)
 
 	return cors(router)

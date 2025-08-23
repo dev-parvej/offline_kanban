@@ -231,6 +231,51 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
+	// Refresh tokens table
+	_, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL,
+            expires_at DATETIME NOT NULL,
+            is_revoked BOOLEAN NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+    `)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_refresh_tokens_updated_at;
+		CREATE TRIGGER update_refresh_tokens_updated_at
+		AFTER UPDATE ON refresh_tokens
+		FOR EACH ROW
+		BEGIN
+			UPDATE refresh_tokens
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Update users table to add missing fields (will only add if not exists)
+	_, err = db.Exec(`ALTER TABLE users ADD COLUMN name TEXT;`)
+	// Ignore error if column already exists
+
+	_, err = db.Exec(`ALTER TABLE users ADD COLUMN designation TEXT;`)
+	// Ignore error if column already exists
+
+	_, err = db.Exec(`ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`)
+	// Ignore error if column already exists
+
+	_, err = db.Exec(`ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;`)
+	// Ignore error if column already exists
+
 	return nil
 }
 

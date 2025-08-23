@@ -3,7 +3,7 @@
 ## Overview
 This document outlines the plan for implementing normal user creation functionality in the Offline Kanban Desktop App. Normal users have limited permissions compared to root users and can only perform specific actions within the system.
 
-## Current Database Schema
+## Current Database Schema (IMPLEMENTED)
 Based on the existing users table structure in `pkg/database/database.go:41-47`:
 
 ```sql
@@ -13,23 +13,38 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT NOT NULL,
     is_root BOOLEAN NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)
+);
 ```
 
-## Required Database Schema Updates
+**Existing Features:**
+- ✅ Basic user structure
+- ✅ Root user support
+- ✅ Username/password authentication
+- ✅ Creation timestamp
+- ✅ Auto-update triggers implemented
+
+## Missing Database Schema Fields
 
 The current schema needs to be extended to support the additional user fields:
 
 ```sql
+-- Migration needed to add:
+ALTER TABLE users ADD COLUMN name TEXT;                           -- Full name of the user
+ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;  -- Last update timestamp  
+ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;        -- Active status for soft delete
+```
+
+**Target Enhanced Schema:**
+```sql
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,                           -- New: Full name of the user
-    username TEXT UNIQUE NOT NULL,               -- Existing: Unique identifier (email/phone/username)
-    password TEXT NOT NULL,                      -- Existing: Hashed password
-    is_root BOOLEAN NOT NULL DEFAULT 0,         -- Existing: Root user flag
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- Existing: Creation timestamp
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- New: Last update timestamp
-    is_active BOOLEAN NOT NULL DEFAULT 1        -- New: Active status for soft delete
+    name TEXT NOT NULL,                           -- TO ADD: Full name of the user
+    username TEXT UNIQUE NOT NULL,               -- EXISTING: Unique identifier
+    password TEXT NOT NULL,                      -- EXISTING: Hashed password
+    is_root BOOLEAN NOT NULL DEFAULT 0,         -- EXISTING: Root user flag
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- EXISTING: Creation timestamp
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- TO ADD: Last update timestamp
+    is_active BOOLEAN NOT NULL DEFAULT 1        -- TO ADD: Active status for soft delete
 )
 ```
 
@@ -49,16 +64,24 @@ CREATE TABLE IF NOT EXISTS users (
 ## Implementation Plan
 
 ### Phase 1: Database Updates
-1. **Update Database Schema**
-   - Add migration for new columns (`name`, `updated_at`, `is_active`)
-   - Create migration handler in `pkg/database/migrations.go`
-   - Update `createTables` function in `database.go`
+1. **Current Status**: ✅ Basic users table exists with auto-update triggers
+2. **Migration Needed**: Add missing fields to existing table
+   ```go
+   // pkg/database/migrations/002_enhance_users.go
+   func EnhanceUsersTable(db *sql.DB) error {
+       // Add: name, updated_at, is_active fields
+       // Populate existing users with default values
+   }
+   ```
+3. **Update Existing Methods**: Modify `AddUser` to handle new fields
 
-2. **Update Database Methods**
-   - Modify `CreateRootUser` to include name field
-   - Update `AddUser` method to accept name parameter
-   - Add `UpdateUser` method for user profile updates
-   - Add `DeactivateUser` method for soft delete
+2. **Database Methods Status**
+   - ✅ `AddUser(username, password)` exists - needs name parameter
+   - ✅ `ValidateUser(username, password)` exists - working
+   - ❌ `CreateRootUser` - TO BE ADDED
+   - ❌ `UpdateUser` - TO BE ADDED for profile updates
+   - ❌ `DeactivateUser` - TO BE ADDED for soft delete
+   - ❌ `GetAllUsers` - TO BE ADDED for user management
 
 ### Phase 2: Backend API Updates
 1. **Update Go Structs**

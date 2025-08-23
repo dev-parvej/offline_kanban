@@ -27,46 +27,89 @@ The Task List page serves as a comprehensive task management interface that comp
 
 ## Database Requirements
 
-### Task List Queries
+**Current Database Status**:
+- ✅ `tasks` table exists (needs status field)
+- ✅ `users` table exists (missing name field)
+- ✅ `columns` table exists  
+- ✅ `comments` table exists
+
+### Task List Queries (ADAPTED FOR CURRENT SCHEMA)
 ```sql
--- Get all tasks with filtering support
+-- Get all tasks with filtering support - CURRENT VERSION
 SELECT 
     t.*,
-    u1.name as assigned_user_name,
+    u1.username as assigned_user_name,        -- CURRENT: using username instead of name
+    u2.username as created_by_user_name,      -- CURRENT: using username instead of name
+    c.title as column_title,                  -- CURRENT: using columns table
+    COUNT(comm.id) as comment_count           -- CURRENT: using comments table
+FROM tasks t
+LEFT JOIN users u1 ON t.assigned_to = u1.id
+LEFT JOIN users u2 ON t.created_by = u2.id
+LEFT JOIN columns c ON t.column_id = c.id     -- CURRENT: columns not board_columns
+LEFT JOIN comments comm ON t.id = comm.task_id -- CURRENT: comments not task_comments
+WHERE 
+    (t.title LIKE ? OR t.description LIKE ?)  -- CURRENT: description not content
+    AND (? IS NULL OR t.assigned_to = ?)       -- Assignee filter
+    AND (? IS NULL OR t.created_by = ?)        -- Creator filter
+    AND (? IS NULL OR t.created_at >= ?)       -- Date from
+    AND (? IS NULL OR t.created_at <= ?)       -- Date to
+    -- NOTE: No status field yet, archived filtering not available
+GROUP BY t.id
+ORDER BY t.updated_at DESC;
+```
+
+### FUTURE Enhanced Query (After Schema Updates):
+```sql
+-- Enhanced version with missing fields
+SELECT 
+    t.*,
+    u1.name as assigned_user_name,            -- After adding name field
     u2.name as created_by_user_name,
     bc.title as column_title,
     COUNT(tc.id) as comment_count
 FROM tasks t
 LEFT JOIN users u1 ON t.assigned_to = u1.id
 LEFT JOIN users u2 ON t.created_by = u2.id
-LEFT JOIN board_columns bc ON t.column_id = bc.id
-LEFT JOIN task_comments tc ON t.id = tc.task_id
+LEFT JOIN columns bc ON t.column_id = bc.id
+LEFT JOIN comments tc ON t.id = tc.task_id
 WHERE 
-    (t.title LIKE ? OR t.content LIKE ?)  -- Search text
-    AND (? IS NULL OR t.assigned_to = ?)   -- Assignee filter
-    AND (? IS NULL OR t.created_by = ?)    -- Creator filter
-    AND (? IS NULL OR t.created_at >= ?)   -- Date from
-    AND (? IS NULL OR t.created_at <= ?)   -- Date to
-    AND (? = 1 OR t.status != 'archived') -- Include archived
+    (t.title LIKE ? OR t.content LIKE ?)      -- After adding content field
+    AND (? IS NULL OR t.assigned_to = ?)
+    AND (? IS NULL OR t.created_by = ?)
+    AND (? IS NULL OR t.created_at >= ?)
+    AND (? IS NULL OR t.created_at <= ?)
+    AND (? = 1 OR t.status != 'archived')     -- After adding status field
 GROUP BY t.id
 ORDER BY t.updated_at DESC;
 ```
 
-### Task Search with Comments
+### Task Search with Comments (CURRENT SCHEMA)
 ```sql
--- Search within task comments as well
+-- Search within task comments as well - CURRENT VERSION
 SELECT DISTINCT t.*
 FROM tasks t
-LEFT JOIN task_comments tc ON t.id = tc.task_id
+LEFT JOIN comments c ON t.id = c.task_id      -- CURRENT: comments table
 WHERE 
     t.title LIKE ? 
-    OR t.content LIKE ?
-    OR tc.comment LIKE ?;
+    OR t.description LIKE ?                    -- CURRENT: description field
+    OR c.content LIKE ?;                       -- CURRENT: content field in comments
 ```
 
-## Implementation Plan
+## Implementation Status & Plan
 
-### Phase 1: Task List Data Layer
+**Current Status**:
+- ✅ Database tables exist (with limitations)
+- ❌ Task List page not implemented
+- ❌ Advanced filtering not available
+- ❌ Backend APIs missing
+- ❌ Frontend components missing
+
+**Database Limitations**:
+- Missing `status` field in tasks (no archive filtering)
+- Missing `name` field in users (using username for display)
+- Missing `content` field in tasks (using description)
+
+### Phase 1: Task List Data Layer (ADAPTED)
 
 1. **Enhanced Task Queries**
    ```go
