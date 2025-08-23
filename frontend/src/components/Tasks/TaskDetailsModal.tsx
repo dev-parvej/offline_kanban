@@ -424,7 +424,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
                       // Sort by timestamp (newest first)
                       const timeValues: Record<string, number> = { '1h': 1, '2h': 2, '2d': 48, '3d': 72 };
                       return (timeValues[a.timestamp] || 0) - (timeValues[b.timestamp] || 0);
-                    }).map((item) => (
+                    }).map((item: any) => (
                       <div key={item.id} className="flex gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                           item.type === 'comment'

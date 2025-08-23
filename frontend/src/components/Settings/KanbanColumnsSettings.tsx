@@ -12,7 +12,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal/Modal';
 import { useToast } from '../../hook';
-import { GripVerticalIcon } from 'lucide-react';
+import { GripVerticalIcon } from '../ui/Icons/GripVerticalIcon';
 
 interface KanbanColumn {
   id: string;

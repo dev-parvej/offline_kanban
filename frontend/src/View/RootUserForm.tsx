@@ -2,9 +2,9 @@ import FormGroup from "../components/ui/FormGroup";
 import {Input} from "../components/ui/Input";
 import {Button} from "../components/ui/Button";
 import {useState} from "react";
-import { SetupRoot } from "../../wailsjs/go/main/App";
 import { useToast } from "../hook";
 import { FieldValues, useForm } from "react-hook-form";
+import { api } from "../api";
 
 export const RootUserForm = ({rootSaved}: {rootSaved: () => void}) => {
     const [ isLoading, setIsLoading ] = useState<boolean>(false)
@@ -14,7 +14,7 @@ export const RootUserForm = ({rootSaved}: {rootSaved: () => void}) => {
     const saveUser = async (data: FieldValues) => {
         setIsLoading(true);
         try {
-            await SetupRoot(data.userName || "", data.password)
+            await api.post("/setup/root-user", data);
             showToast("Root user created successfully!", "success");
         } catch (error) {
             console.error("Error creating root user:", error);

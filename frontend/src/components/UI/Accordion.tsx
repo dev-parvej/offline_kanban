@@ -1,6 +1,6 @@
 'use client';
-import React, { ReactNode, useRef, useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ReactNode, useRef, useState, useEffect } from 'react';
+import { ChevronDown } from '../ui/Icons/ChevronDown';
 
 type AccordionItemProps = {
   title: string;
@@ -46,7 +46,6 @@ export const AccordionItem = ({
       >
         <span>{title}</span>
         <ChevronDown
-          size={18}
           className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>

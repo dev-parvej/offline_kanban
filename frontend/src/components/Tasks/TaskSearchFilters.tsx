@@ -131,7 +131,7 @@ export const TaskSearchFilters: React.FC<TaskSearchFiltersProps> = ({
             <Button
               type="button"
               onClick={handleClearAll}
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
             >
