@@ -2,7 +2,6 @@ import {useEffect, useState} from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Container from './components/ui/Gird/Container';
 import {Modal} from "./components/ui/Modal";
-import {IsSetupComplete} from "../wailsjs/go/main/App"
 import {RootUserForm} from "./View/RootUserForm";
 import { Navbar } from './components/ui/Navbar/Navbar';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -10,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Tasks } from './pages/Tasks';
 import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
+import { api } from './api';
 
 // Component to handle navigation and active states
 function AppContent() {
@@ -38,11 +38,11 @@ function AppContent() {
 }
 
 function App() {
-  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(true);
 
   useEffect(() => {
     const checkSetup = async () => {
-      const isSetupComplete = await IsSetupComplete();
+      const { data: isSetupComplete } = await api.get('/setup/is-setup-complete');
 
       if (!isSetupComplete) {
         setShowSetupModal(true);
@@ -51,7 +51,7 @@ function App() {
       }
     };
     checkSetup();
-  }, []);
+  }, [setShowSetupModal, api, showSetupModal]);
 
   return (
     <Router>

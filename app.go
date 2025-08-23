@@ -2,60 +2,126 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/dev-parvej/offline_kanban/pkg/database"
-	"github.com/dev-parvej/offline_kanban/pkg/util"
 )
 
-// App struct
+var frontend embed.FS
+
 type App struct {
-	ctx context.Context
-	db  *database.Database
+	server *http.Server
+	ctx    context.Context
+	db     *database.Database
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (app *App) startup(ctx context.Context) {
+	app.ctx = ctx
+
 	db, err := database.InitDatabase()
-
-	fmt.Println(db)
-	fmt.Println(err)
-
 	if err != nil {
 		panic(err)
 	}
-	a.db = db
+	app.db = db
+	fmt.Println("Database initialized:", db)
+
+	ip, err := GetLocalIP()
+	if err != nil {
+		ip = "localhost"
+	}
+
+	router := SetUpGorilaMuxServer(app.db)
+
+	port := 8989
+
+	app.server = &http.Server{
+		Addr:              fmt.Sprintf(":%d", port),
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	writeFrontendConfig(fmt.Sprintf(`window.BACKEND_URL = "http://%s:%d";`, ip, port))
+
+	go func() {
+		fmt.Printf("Server available at: http://%s:%d\n", ip, port)
+		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Println("HTTP server error:", err)
+		}
+	}()
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+func (app *App) shutdown(ctx context.Context) {
+	if app.server != nil {
+		fmt.Println("Shutting down HTTP server...")
+		_ = app.server.Shutdown(ctx)
+	}
 }
 
-// IsSetupComplete checks if the initial setup is done
-func (a *App) IsSetupComplete() bool {
-	return a.db.IsSetupComplete()
+func isPrivateIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return false
+	}
+	privateBlocks := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+	}
+	for _, block := range privateBlocks {
+		_, cidr, _ := net.ParseCIDR(block)
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
-// SetupRoot creates the root user during first run
-func (a *App) SetupRoot(username, password string) error {
-	hashed, _ := util.HashPassword(password)
-	return a.db.CreateRootUser(username, hashed)
+func GetLocalIP() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.To4() == nil {
+				continue
+			}
+			if isPrivateIP(ip) {
+				return ip.String(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no private IP found")
 }
 
-// Login validates user credentials
-func (a *App) Login(username, password string) (bool, bool, error) {
-	return a.db.ValidateUser(username, password)
-}
+func writeFrontendConfig(ip string) error {
+	// Path to where your React build files live (adjust this!)
+	filePath := "frontend/config.js"
 
-// AddUser adds a new user (only available to root)
-func (a *App) AddUser(username, password string) error {
-	return a.db.AddUser(username, password)
+	return os.WriteFile(filePath, []byte(ip), 0644)
 }

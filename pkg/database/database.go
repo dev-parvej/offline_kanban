@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dev-parvej/offline_kanban/config"
 	"github.com/dev-parvej/offline_kanban/pkg/util"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -21,7 +22,7 @@ func InitDatabase() (*Database, error) {
 	}
 
 	// Open database
-	dbPath := filepath.Join(dbDir, "app.db")
+	dbPath := filepath.Join(dbDir, config.Get("DB_NAME"))
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
@@ -50,6 +51,22 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_users_updated_at;
+		CREATE TRIGGER update_users_updated_at
+		AFTER UPDATE ON users
+		FOR EACH ROW
+		BEGIN
+			UPDATE users
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+
+	if err != nil {
+		return err
+	}
+
 	// Setup tracking table
 	_, err = db.Exec(`
         CREATE TABLE IF NOT EXISTS setup_status (
@@ -62,58 +79,173 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
-	return nil
-}
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_setup_status_updated_at;
+		CREATE TRIGGER update_setup_status_updated_at
+		AFTER UPDATE ON setup_status
+		FOR EACH ROW
+		BEGIN
+			UPDATE setup_status
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
 
-// Check if initial setup is complete
-func (d *Database) IsSetupComplete() bool {
-	var isComplete bool
-	err := d.db.QueryRow("SELECT is_complete FROM setup_status WHERE id = 1").Scan(&isComplete)
-	if err != nil {
-		return false
-	}
-	return isComplete
-}
-
-// Create root user and mark setup as complete
-func (d *Database) CreateRootUser(username, password string) error {
-	tx, err := d.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Insert root user
-	_, err = tx.Exec(`
-        INSERT INTO users (username, password, is_root)
-        VALUES (?, ?, 1)
-    `, username, password) // Note: In production, password should be hashed
 	if err != nil {
 		return err
 	}
 
-	// Mark setup as complete
-	_, err = tx.Exec(`
-        INSERT OR REPLACE INTO setup_status (id, is_complete, completed_at)
-        VALUES (1, 1, CURRENT_TIMESTAMP)
+	_, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS columns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title varchar NOT NULL,
+            created_by INTEGER NOT NULL,
+            colors varchar NULL,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        );
+    `)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_columns_updated_at;
+		CREATE TRIGGER update_columns_updated_at
+		AFTER UPDATE ON columns
+		FOR EACH ROW
+		BEGIN
+			UPDATE columns
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            column_id INTEGER NOT NULL,
+            assigned_to INTEGER,
+            created_by INTEGER NOT NULL,
+            due_date DATETIME,
+			priority varchar NULL,
+            position INTEGER NOT NULL,
+			weight INTEGER default 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL,
+            FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        );
     `)
 	if err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_tasks_updated_at;
+		CREATE TRIGGER update_tasks_updated_at
+		AFTER UPDATE ON tasks
+		FOR EACH ROW
+		BEGIN
+			UPDATE tasks
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            task_id INTEGER NOT NULL,
+            created_by INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+        );
+    `)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_comments_updated_at;
+		CREATE TRIGGER update_comments_updated_at
+		AFTER UPDATE ON comments
+		FOR EACH ROW
+		BEGIN
+			UPDATE comments
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS  checklists (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			created_by INTEGER NOT NULL,
+			completed_by INTEGER,
+			task_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE  SET NULL,
+			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE  SET NULL,
+			FOREIGN KEY (completed_by) REFERENCES users(id) ON DELETE SET NULL
+		);
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		DROP TRIGGER IF EXISTS update_checklist_updated_at;
+		CREATE TRIGGER update_checklist_updated_at
+		AFTER UPDATE ON checklists
+		FOR EACH ROW
+		BEGIN
+			UPDATE checklists
+			SET updated_at = CURRENT_TIMESTAMP
+			WHERE id = OLD.id;
+		END;
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// Add new user (only root can add)
+func (d *Database) Instance() *sql.DB {
+	return d.db
+}
+
 func (d *Database) AddUser(username, password string) error {
 	_, err := d.db.Exec(`
         INSERT INTO users (username, password, is_root)
         VALUES (?, ?, 0)
-    `, username, password) // Note: In production, password should be hashed
+    `, username, password)
 	return err
 }
 
-// Validate user credentials
 func (d *Database) ValidateUser(username, password string) (bool, bool, error) {
 	var storedPassword string
 	var isRoot bool

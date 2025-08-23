@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { GripVerticalIcon } from 'lucide-react';
+import { GripVerticalIcon } from '../ui/Icons/GripVerticalIcon';
 
 interface ChecklistItem {
   id: string;

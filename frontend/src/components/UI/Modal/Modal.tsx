@@ -63,7 +63,7 @@ export const Modal = ({ isOpen, onClose, children, className = '' }: ModalProps)
         </div>
         
         {/* Custom Scrollbar Styles */}
-        <style jsx>{`
+        <style>{`
           .custom-scrollbar {
             scrollbar-width: thin;
             scrollbar-color: rgb(156 163 175) transparent;
