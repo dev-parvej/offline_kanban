@@ -36,50 +36,54 @@ Based on previous descriptions:
 
 ## Database Schema Design
 
-### Tasks Table
+### Tasks Table (CURRENT IMPLEMENTATION)
 ```sql
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,                        -- Task title
-    content TEXT,                              -- Task description/content
-    column_id INTEGER NOT NULL,                -- Reference to board column
-    assigned_to INTEGER,                       -- User assigned to this task
-    created_by INTEGER NOT NULL,              -- User who created the task
-    priority TEXT DEFAULT 'medium',           -- Priority: low, medium, high, urgent
-    status TEXT DEFAULT 'active',             -- Status: active, completed, archived
-    auto_archive_days INTEGER,                -- Days until auto-archive (NULL = never)
-    archive_date DATETIME,                    -- Calculated archive date
-    completed_at DATETIME,                    -- When task was marked complete
-    archived_at DATETIME,                     -- When task was archived
+    title TEXT NOT NULL,
+    description TEXT,                          -- CURRENT: Using 'description' instead of 'content'
+    column_id INTEGER NOT NULL,
+    assigned_to INTEGER,
+    created_by INTEGER NOT NULL,
+    due_date DATETIME,                         -- CURRENT: Has due_date field
+    priority varchar NULL,                     -- CURRENT: VARCHAR, nullable
+    position INTEGER NOT NULL,                 -- CURRENT: Has position for ordering
+    weight INTEGER default 0,                 -- CURRENT: Has weight field
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (column_id) REFERENCES board_columns(id),
-    FOREIGN KEY (assigned_to) REFERENCES users(id),
-    FOREIGN KEY (created_by) REFERENCES users(id),
-    
-    CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-    CHECK (status IN ('active', 'completed', 'archived')),
-    CHECK (auto_archive_days IS NULL OR auto_archive_days > 0)
+    FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL,  -- CURRENT: References 'columns', not 'board_columns'
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 ```
 
-### Task Comments Table
+### MISSING FIELDS (To be added in migration):
+- `status` - For active/completed/archived states
+- `auto_archive_days` - For auto-archiving functionality
+- `archive_date` - Calculated archive date
+- `completed_at` - Task completion timestamp
+- `archived_at` - Task archiving timestamp
+- Priority constraints and status checks
+```
+
+### Comments Table (CURRENT IMPLEMENTATION)
 ```sql
-CREATE TABLE IF NOT EXISTS task_comments (
+CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,                     -- CURRENT: Using 'content' instead of 'comment'
     task_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    comment TEXT NOT NULL,
+    created_by INTEGER NOT NULL,              -- CURRENT: Using 'created_by' instead of 'user_id'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE  -- CURRENT: CASCADE delete
 );
 ```
 
-### Task History Table
+### Task History Table (NOT IMPLEMENTED)
+**STATUS: TO BE CREATED**
 ```sql
 CREATE TABLE IF NOT EXISTS task_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +103,24 @@ CREATE TABLE IF NOT EXISTS task_history (
 );
 ```
 
-### Task Attachments Table (Future)
+### Checklists Table (CURRENT IMPLEMENTATION)
+```sql
+CREATE TABLE IF NOT EXISTS checklists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    created_by INTEGER NOT NULL,
+    completed_by INTEGER,                      -- User who completed this item
+    task_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+    FOREIGN KEY (completed_by) REFERENCES users(id) ON DELETE SET NULL
+);
+```
+
+### Task Attachments Table (FUTURE ENHANCEMENT)
 ```sql
 CREATE TABLE IF NOT EXISTS task_attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

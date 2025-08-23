@@ -5,6 +5,9 @@ import {Modal} from "./components/ui/Modal";
 import {RootUserForm} from "./View/RootUserForm";
 import { Navbar } from './components/ui/Navbar/Navbar';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { LoginPage } from './components/Auth/LoginPage';
 import { Dashboard } from './pages/Dashboard';
 import { Tasks } from './pages/Tasks';
 import { Users } from './pages/Users';
@@ -14,23 +17,68 @@ import { api } from './api';
 // Component to handle navigation and active states
 function AppContent() {
   const location = useLocation();
+  const { user } = useAuth();
   
-  const getMenuItems = () => [
-    { label: 'Board', href: '/', active: location.pathname === '/' },
-    { label: 'Search', href: '/tasks', active: location.pathname === '/tasks' },
-    { label: 'Users', href: '/users', active: location.pathname === '/users' },
-    { label: 'Settings', href: '/settings', active: location.pathname === '/settings' }
-  ];
+  const getMenuItems = () => {
+    const baseItems = [
+      { label: 'Board', href: '/', active: location.pathname === '/' },
+      { label: 'Search', href: '/tasks', active: location.pathname === '/tasks' }
+    ];
+
+    // Add root-only menu items
+    if (user?.is_root) {
+      baseItems.push(
+        { label: 'Users', href: '/users', active: location.pathname === '/users' },
+        { label: 'Settings', href: '/settings', active: location.pathname === '/settings' }
+      );
+    }
+
+    return baseItems;
+  };
 
   return (
     <div className="bg-white dark:bg-gray-900 min-h-screen">
       <Navbar menuItems={getMenuItems()} />
       <Container isFluid>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/settings" element={<Settings />} />
+          {/* Public route */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Protected routes for both root and normal users */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute allowedFor="both">
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/tasks" 
+            element={
+              <ProtectedRoute allowedFor="both">
+                <Tasks />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Root-only routes */}
+          <Route 
+            path="/users" 
+            element={
+              <ProtectedRoute allowedFor="root">
+                <Users />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute allowedFor="root">
+                <Settings />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </Container>
     </div>
@@ -38,28 +86,36 @@ function AppContent() {
 }
 
 function App() {
-  const [showSetupModal, setShowSetupModal] = useState(true);
+  const [showSetupModal, setShowSetupModal] = useState(false);
 
   useEffect(() => {
     const checkSetup = async () => {
-      const { data: isSetupComplete } = await api.get('/setup/is-setup-complete');
+      try {
+        const { data: isSetupComplete } = await api.get('/setup/is-setup-complete');
 
-      if (!isSetupComplete) {
+        if (!isSetupComplete) {
+          setShowSetupModal(true);
+        } else {
+          setShowSetupModal(false);
+        }
+      } catch (error) {
+        console.error('Error checking setup status:', error);
+        // If API fails, assume setup is needed
         setShowSetupModal(true);
-      } else {
-        setShowSetupModal(false);
       }
     };
     checkSetup();
-  }, [setShowSetupModal, api, showSetupModal]);
+  }, []);
 
   return (
     <Router>
       <ThemeProvider>
-        <Modal isOpen={showSetupModal} onClose={() => setShowSetupModal(false)}>
-          <RootUserForm rootSaved={() => setShowSetupModal(false)} />
-        </Modal>
-        <AppContent />
+        <AuthProvider>
+          <Modal isOpen={showSetupModal} onClose={() => setShowSetupModal(false)}>
+            <RootUserForm rootSaved={() => setShowSetupModal(false)} />
+          </Modal>
+          <AppContent />
+        </AuthProvider>
       </ThemeProvider>
     </Router>
   );

@@ -5,16 +5,44 @@ This document outlines the plan for implementing dynamic board column creation a
 
 ## Current Implementation Analysis
 
-Currently, board columns are hardcoded in the frontend (`frontend/src/App.tsx:26-54`):
+**Database Status**: Basic `columns` table exists with minimal fields:
+- `id`, `title`, `created_by`, `colors`
+- Missing advanced features: positioning, archiving, descriptions
+- No linked-list structure for ordering
+- No validation constraints
+
+**Frontend Status**: Currently uses hardcoded columns:
 - `col-1`: "To Do"
 - `col-2`: "In Progress" 
 - `col-3`: "Done"
 
-The structure uses a parent-child relationship with a root container, but columns are not persisted in the database.
+**Gap**: Frontend hardcoded columns vs database dynamic columns - need to bridge this gap.
 
 ## Database Schema Design
 
-### Board Columns Table
+### Columns Table (CURRENT IMPLEMENTATION)
+```sql
+CREATE TABLE IF NOT EXISTS columns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title varchar NOT NULL,                     -- CURRENT: Using VARCHAR
+    created_by INTEGER NOT NULL,
+    colors varchar NULL,                        -- CURRENT: Simple colors field
+    
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL  -- CURRENT: SET NULL on delete
+);
+```
+
+### MISSING FIELDS (To be added in future migration):
+- `description` - Optional column description
+- `before_column_id` - For linked-list ordering
+- `after_column_id` - For linked-list ordering  
+- `is_archived` - Archive status for columns
+- `created_at` - Creation timestamp
+- `updated_at` - Last update timestamp
+- Position validation constraints
+- Self-reference checks
+
+### Proposed Enhanced Schema (Board Columns)
 ```sql
 CREATE TABLE IF NOT EXISTS board_columns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,12 +91,16 @@ CREATE TABLE IF NOT EXISTS board_columns (
 
 ## Implementation Plan
 
-### Phase 1: Database Implementation
+### Phase 1: Database Enhancement
 
-1. **Create Migration**
+1. **Current Status**: Basic `columns` table exists
+2. **Migration Needed**: Add missing fields to existing table
    ```go
-   // pkg/database/migrations/001_create_board_columns.go
-   func CreateBoardColumnsTable(db *sql.DB) error
+   // pkg/database/migrations/001_enhance_columns.go
+   func EnhanceColumnsTable(db *sql.DB) error {
+       // Add: description, before_column_id, after_column_id, is_archived, created_at, updated_at
+       // Add constraints for linked-list validation
+   }
    ```
 
 2. **Seed Default Columns**

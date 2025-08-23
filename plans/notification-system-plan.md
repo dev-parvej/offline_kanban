@@ -52,7 +52,12 @@ enum NotificationType {
 
 ## Database Schema Design
 
-### Notifications Table
+### Notifications Table (NOT IMPLEMENTED)
+**STATUS: TO BE CREATED**
+
+**Current Database Status**: ❌ Notifications system not implemented
+
+**Proposed Schema:**
 ```sql
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +82,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (recipient_id) REFERENCES users(id),
     FOREIGN KEY (sender_id) REFERENCES users(id),
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (comment_id) REFERENCES task_comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,  -- Note: comments table exists
     
     CHECK (type IN (
         'task_assigned', 'task_unassigned', 'task_commented', 'comment_replied',
@@ -88,7 +93,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 ```
 
-### Notification Preferences Table (Future)
+### Notification Preferences Table (FUTURE ENHANCEMENT)
+**STATUS: TO BE CREATED LATER**
+
 ```sql
 CREATE TABLE IF NOT EXISTS notification_preferences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +110,19 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 );
 ```
 
-## Implementation Plan
+## Implementation Status & Plan
+
+**Current Status**: ❌ No notification system implemented
+- No database tables
+- No backend APIs
+- No frontend components
+- No notification logic
+
+**Dependencies**: 
+- ✅ Users table exists
+- ✅ Tasks table exists  
+- ✅ Comments table exists
+- ❌ Task history tracking missing
 
 ### Phase 1: Notification Database Layer
 

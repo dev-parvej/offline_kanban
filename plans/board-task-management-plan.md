@@ -44,34 +44,53 @@ This document outlines the updated plan for implementing task management functio
 
 ## Database Schema Updates
 
-### Tasks Table (Updated)
+### Tasks Table Status
+
+**CURRENT IMPLEMENTATION:**
 ```sql
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    content TEXT,
+    description TEXT,                          -- CURRENT: description instead of content
     column_id INTEGER NOT NULL,
-    assigned_to INTEGER,                       -- NULL means unassigned
-    created_by INTEGER NOT NULL,
-    priority TEXT DEFAULT 'medium',
-    status TEXT DEFAULT 'active',
-    auto_archive_days INTEGER,
-    archive_date DATETIME,
-    completed_at DATETIME,
-    archived_at DATETIME,
+    assigned_to INTEGER,                       -- ✅ NULL means unassigned
+    created_by INTEGER NOT NULL,              -- ✅ Implemented
+    due_date DATETIME,                         -- CURRENT: has due_date
+    priority varchar NULL,                     -- CURRENT: varchar, nullable
+    position INTEGER NOT NULL,                 -- CURRENT: has position field
+    weight INTEGER default 0,                 -- CURRENT: has weight field
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (column_id) REFERENCES board_columns(id),
-    FOREIGN KEY (assigned_to) REFERENCES users(id),
-    FOREIGN KEY (created_by) REFERENCES users(id),
-    
-    CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-    CHECK (status IN ('active', 'completed', 'archived'))
+    FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL,  -- CURRENT: columns table
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 ```
 
-### Board Filter State Table (Optional - for saved filters)
+**MISSING FIELDS (Need Migration):**
+- `status` - For active/completed/archived states
+- `auto_archive_days` - Auto-archiving functionality
+- `archive_date` - Calculated archive date
+- `completed_at` - Task completion timestamp
+- `archived_at` - Task archiving timestamp
+- Priority and status constraints
+
+**TARGET ENHANCED SCHEMA:**
+```sql
+-- After migration:
+ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'active';
+ALTER TABLE tasks ADD COLUMN auto_archive_days INTEGER;
+ALTER TABLE tasks ADD COLUMN archive_date DATETIME;
+ALTER TABLE tasks ADD COLUMN completed_at DATETIME;
+ALTER TABLE tasks ADD COLUMN archived_at DATETIME;
+ALTER TABLE tasks ADD CONSTRAINT priority_check CHECK (priority IN ('low', 'medium', 'high', 'urgent'));
+ALTER TABLE tasks ADD CONSTRAINT status_check CHECK (status IN ('active', 'completed', 'archived'));
+```
+
+### Board Filter State Table (NOT IMPLEMENTED)
+**STATUS: TO BE CREATED**
+
 ```sql
 CREATE TABLE IF NOT EXISTS board_filters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +107,22 @@ CREATE TABLE IF NOT EXISTS board_filters (
 );
 ```
 
-## Implementation Plan
+## Implementation Status & Plan
+
+**Current Status**:
+- ✅ Basic tasks table exists
+- ✅ User assignment supported
+- ✅ Comments system exists
+- ❌ Permission system not implemented
+- ❌ Board filtering not implemented
+- ❌ Task status management missing
+- ❌ Assignment workflow missing
+
+**Database Dependencies**:
+- ✅ Tasks table exists (needs enhancement)
+- ✅ Users table exists (needs name field)
+- ✅ Comments table exists
+- ❌ Board filters table missing
 
 ### Phase 1: Updated Task Permission System
 
