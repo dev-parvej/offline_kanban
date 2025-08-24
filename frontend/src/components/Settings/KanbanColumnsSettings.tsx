@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, FieldValues } from 'react-hook-form';
 import { 
   PlusIcon, 
@@ -13,28 +13,25 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal/Modal';
 import { useToast } from '../../hook';
 import { GripVerticalIcon } from '../ui/Icons/GripVerticalIcon';
+import { api } from '../../api';
 
 interface KanbanColumn {
-  id: string;
-  name: string;
+  id?: number;
+  title: string;
   position: number;
-  color?: string;
+  colors?: string;
 }
 
 export const KanbanColumnsSettings: React.FC = () => {
   const { showToast, ToastContainer } = useToast();
   
   // Mock data - will be replaced with API calls
-  const [columns, setColumns] = useState<KanbanColumn[]>([
-    { id: 'col-1', name: 'To Do', position: 1, color: '#ef4444' },
-    { id: 'col-2', name: 'In Progress', position: 2, color: '#f59e0b' },
-    { id: 'col-3', name: 'Done', position: 3, color: '#10b981' }
-  ]);
+  const [columns, setColumns] = useState<KanbanColumn[]>([]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedColumn, setSelectedColumn] = useState<KanbanColumn | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);  
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
@@ -42,15 +39,17 @@ export const KanbanColumnsSettings: React.FC = () => {
     setIsLoading(true);
     try {
       const newColumn: KanbanColumn = {
-        id: `col-${Date.now()}`,
-        name: data.name,
+        title: data.title,
         position: columns.length + 1,
-        color: data.color || '#6b7280'
+        colors: data.color || '#6b7280'
       };
-      setColumns(prev => [...prev, newColumn]);
+      
+      await api.post('/settings/columns', newColumn)
+
       showToast("Column created successfully!", "success");
       reset();
       setShowCreateModal(false);
+      fetchColumns()
     } catch (error) {
       showToast("Failed to create column.", "error");
     } finally {
@@ -65,13 +64,17 @@ export const KanbanColumnsSettings: React.FC = () => {
     try {
       setColumns(prev => prev.map(col => 
         col.id === selectedColumn.id 
-          ? { ...col, name: data.name, color: data.color || col.color }
+          ? { ...col, title: data.title, colors: data.colors || col.colors }
           : col
       ));
+
+      await api.put(`/settings/columns/${selectedColumn.id}`, data)
+      
       showToast("Column updated successfully!", "success");
       reset();
       setShowEditModal(false);
       setSelectedColumn(null);
+      fetchColumns()
     } catch (error) {
       showToast("Failed to update column.", "error");
     } finally {
@@ -89,7 +92,7 @@ export const KanbanColumnsSettings: React.FC = () => {
     showToast("Column deleted successfully!", "success");
   };
 
-  const handleMoveColumn = (columnId: string, direction: 'up' | 'down') => {
+  const handleMoveColumn = (columnId: number, direction: 'up' | 'down') => {
     const columnIndex = columns.findIndex(col => col.id === columnId);
     if (
       (direction === 'up' && columnIndex === 0) ||
@@ -113,10 +116,21 @@ export const KanbanColumnsSettings: React.FC = () => {
 
   const openEditModal = (column: KanbanColumn) => {
     setSelectedColumn(column);
-    setValue('name', column.name);
-    setValue('color', column.color);
+    setValue('title', column.title);
+    setValue('colors', column.colors);
     setShowEditModal(true);
   };
+
+  const fetchColumns = async () => {
+    setIsLoading(true)
+    const { data } = await api.get('/settings/columns/with-counts')
+    setColumns(data.columns)
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    fetchColumns();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -154,12 +168,12 @@ export const KanbanColumnsSettings: React.FC = () => {
                   
                   <div
                     className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600"
-                    style={{ backgroundColor: column.color }}
+                    style={{ backgroundColor: column.colors }}
                   />
                   
                   <div>
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {column.name}
+                      {column.title}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       Position: {column.position}
@@ -170,7 +184,7 @@ export const KanbanColumnsSettings: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   {/* Move Up/Down */}
                   <button
-                    onClick={() => handleMoveColumn(column.id, 'up')}
+                    onClick={() => handleMoveColumn(column.id as number, 'up')}
                     disabled={index === 0}
                     className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
                     title="Move Up"
@@ -179,7 +193,7 @@ export const KanbanColumnsSettings: React.FC = () => {
                   </button>
                   
                   <button
-                    onClick={() => handleMoveColumn(column.id, 'down')}
+                    onClick={() => handleMoveColumn(column.id as number, 'down')}
                     disabled={index === columns.length - 1}
                     className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
                     title="Move Down"
@@ -225,13 +239,13 @@ export const KanbanColumnsSettings: React.FC = () => {
           <h3 className="text-lg font-medium mb-4">Create New Column</h3>
           
           <form onSubmit={handleSubmit(handleCreateColumn)} className="space-y-4">
-            <FormGroup label="Column Name" errorMessage={errors.name?.message as string}>
+            <FormGroup label="Column title" errorMessage={errors.title?.message as string}>
               <Input
                 placeholder="Enter column name..."
-                {...register("name", {
-                  required: "Column name is required",
-                  minLength: { value: 1, message: "Column name cannot be empty" },
-                  maxLength: { value: 50, message: "Column name too long" }
+                {...register("title", {
+                  required: "Column title is required",
+                  minLength: { value: 1, message: "Column title cannot be empty" },
+                  maxLength: { value: 50, message: "Column title too long" }
                 })}
               />
             </FormGroup>
@@ -239,7 +253,7 @@ export const KanbanColumnsSettings: React.FC = () => {
             <FormGroup label="Color">
               <Input
                 type="color"
-                {...register("color")}
+                {...register("colors")}
               />
             </FormGroup>
 
@@ -276,7 +290,7 @@ export const KanbanColumnsSettings: React.FC = () => {
             <FormGroup label="Column Name" errorMessage={errors.name?.message as string}>
               <Input
                 placeholder="Enter column name..."
-                {...register("name", {
+                {...register("title", {
                   required: "Column name is required",
                   minLength: { value: 1, message: "Column name cannot be empty" },
                   maxLength: { value: 50, message: "Column name too long" }
@@ -287,7 +301,7 @@ export const KanbanColumnsSettings: React.FC = () => {
             <FormGroup label="Color">
               <Input
                 type="color"
-                {...register("color")}
+                {...register("colors")}
               />
             </FormGroup>
 

@@ -27,8 +27,8 @@ func ColumnsController(router *mux.Router, db *database.Database) *Columns {
 }
 
 func (columns *Columns) Router() {
-	columnsRouter := columns.router.PathPrefix("/columns").Subrouter()
-	
+	columnsRouter := columns.router.PathPrefix("/settings/columns").Subrouter()
+
 	// Apply authentication middleware first, then root user middleware
 	columnsRouter.Use(middleware.Authenticate)
 	columnsRouter.Use(middleware.RequireRoot(columns.db))
@@ -271,7 +271,7 @@ func (columns *Columns) moveAllTasksFromColumn(w http.ResponseWriter, r *http.Re
 	}
 
 	requestBody, errors := util.ValidateRequest(r, MoveTasksRequest{})
-	
+
 	if errors != nil {
 		util.Res.Writer(w).Status422().Data(errors.Error())
 		return

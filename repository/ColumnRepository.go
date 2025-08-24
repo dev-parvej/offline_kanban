@@ -165,7 +165,7 @@ func (cr *ColumnRepository) GetAllWithTaskCounts() ([]*Column, error) {
 	}
 	defer rows.Close()
 
-	var columns []*Column
+	columns := make([]*Column, 0)
 	for rows.Next() {
 		column := &Column{}
 		err := rows.Scan(
@@ -365,7 +365,7 @@ func (cr *ColumnRepository) GetByCreator(createdBy int) ([]*Column, error) {
 
 // Helper method to scan columns
 func (cr *ColumnRepository) scanColumns(rows *sql.Rows) ([]*Column, error) {
-	var columns []*Column
+	columns := make([]*Column, 0)
 	for rows.Next() {
 		column := &Column{}
 		err := rows.Scan(

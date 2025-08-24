@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -115,7 +116,7 @@ func (auth *Auth) logout(w http.ResponseWriter, r *http.Request) {
 
 func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 	refreshDto, errors := util.ValidateRequest(r, dto.RefreshTokenDto{})
-
+	fmt.Println(refreshDto)
 	if errors != nil {
 		util.Res.Writer(w).Status422().Data(errors.Error())
 		return
@@ -123,12 +124,16 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 
 	_, err := util.Token().VerifyToken(refreshDto.RefreshToken)
 
+	fmt.Println(err.Error())
+
 	if err != nil {
 		util.Res.Writer(w).Status(401).Data(err.Error())
 		return
 	}
 
 	userToken, err := auth.refreshTokenRepository.FindByToken(refreshDto.RefreshToken)
+
+	fmt.Println(userToken, err.Error())
 
 	if err != nil {
 		util.Res.Writer(w).Status(401).Data(err.Error())
@@ -141,7 +146,7 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accessToken, newRefreshToken, _ := generateAccessAndRefreshToken(userToken.UserID)
-
+	fmt.Println(accessToken, newRefreshToken)
 	go auth.refreshTokenRepository.RevokeToken(refreshDto.RefreshToken)
 
 	util.Res.Writer(w).Status().Data(dto.NewRefreshTokenResponse().Create(map[string]interface{}{
@@ -153,7 +158,7 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 func (auth *Auth) verifySession(w http.ResponseWriter, r *http.Request) {
 	bearer := r.Header.Get("Authorization")
 
-	if bearer == "" {
+	if bearer == "Bearer " {
 		util.Res.Writer(w).Status403().Data(map[string]string{"message": "LoginRequired"})
 		return
 	}
