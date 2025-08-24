@@ -3,9 +3,14 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/dev-parvej/js_array_method"
 	"github.com/dev-parvej/offline_kanban/pkg/database"
+	"github.com/dev-parvej/offline_kanban/pkg/dto"
+	"github.com/dev-parvej/offline_kanban/pkg/util"
 )
 
 type Column struct {
@@ -19,6 +24,7 @@ type Column struct {
 	// Related data (loaded separately)
 	CreatedByUser *User `json:"created_by_user,omitempty"`
 	TaskCount     int   `json:"task_count,omitempty"`
+	Position      int   `json:"position,omitempty"`
 }
 
 type ColumnRepository struct {
@@ -46,6 +52,7 @@ func (cr *ColumnRepository) FindByID(id int) (*Column, error) {
 		&column.Colors,
 		&column.CreatedAt,
 		&column.UpdatedAt,
+		&column.Position,
 	)
 
 	if err != nil {
@@ -56,6 +63,24 @@ func (cr *ColumnRepository) FindByID(id int) (*Column, error) {
 	}
 
 	return column, nil
+}
+
+// Find column by ID
+func (cr *ColumnRepository) FindByIDs(ids []int) ([]*Column, error) {
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1] // remove last comma
+
+	query := fmt.Sprintf(`SELECT id, title, created_by, colors, created_at, updated_at, position
+                      FROM columns 
+                      WHERE id IN (%s)`, placeholders)
+
+	rows, err := cr.db.Instance().Query(query, util.ConvertToInterface(ids)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return cr.scanColumns(rows)
 }
 
 // Create new column
@@ -153,11 +178,11 @@ func (cr *ColumnRepository) GetAll() ([]*Column, error) {
 func (cr *ColumnRepository) GetAllWithTaskCounts() ([]*Column, error) {
 	query := `
 		SELECT c.id, c.title, c.created_by, c.colors, c.created_at, c.updated_at,
-		       COUNT(t.id) as task_count
+		       COUNT(t.id) as task_count, c.position
 		FROM columns c
 		LEFT JOIN tasks t ON c.id = t.column_id
 		GROUP BY c.id, c.title, c.created_by, c.colors, c.created_at, c.updated_at
-		ORDER BY c.created_at ASC`
+		ORDER BY c.position ASC`
 
 	rows, err := cr.db.Instance().Query(query)
 	if err != nil {
@@ -176,6 +201,7 @@ func (cr *ColumnRepository) GetAllWithTaskCounts() ([]*Column, error) {
 			&column.CreatedAt,
 			&column.UpdatedAt,
 			&column.TaskCount,
+			&column.Position,
 		)
 		if err != nil {
 			return nil, err
@@ -220,6 +246,7 @@ func (cr *ColumnRepository) GetAllWithCreators() ([]*Column, error) {
 			&creatorUsername,
 			&creatorName,
 			&column.TaskCount,
+			&column.Position,
 		)
 		if err != nil {
 			return nil, err
@@ -283,30 +310,23 @@ func (cr *ColumnRepository) TitleExists(title string, excludeID *int) (bool, err
 	return count > 0, nil
 }
 
-// Reorder columns (future enhancement - requires order field in DB)
-func (cr *ColumnRepository) Reorder(columnIDs []int) error {
-	// Start transaction
+func (cr *ColumnRepository) Reorder(columnOrders []dto.ColumnsOrder) error {
 	tx, err := cr.db.Instance().Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	// For now, we'll update based on the order provided
-	// This would require an 'order_position' field in the columns table
-	for i, columnID := range columnIDs {
-		_, err = tx.Exec(`
-			UPDATE columns 
-			SET updated_at = CURRENT_TIMESTAMP 
-			WHERE id = ?`, columnID)
+	js_array_method.Foreach(columnOrders, func(order dto.ColumnsOrder, _ int) {
+		_, err := tx.Exec(`
+			UPDATE columns
+			SET position = ?,
+			    updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`, order.Position, order.ID)
 		if err != nil {
-			return err
+			panic(err)
 		}
-
-		// Log the intended order (position i+1)
-		// In a real implementation, you'd update an order_position field
-		_ = i + 1 // Position for this column
-	}
+	})
 
 	return tx.Commit()
 }
@@ -375,6 +395,7 @@ func (cr *ColumnRepository) scanColumns(rows *sql.Rows) ([]*Column, error) {
 			&column.Colors,
 			&column.CreatedAt,
 			&column.UpdatedAt,
+			&column.Position,
 		)
 		if err != nil {
 			return nil, err

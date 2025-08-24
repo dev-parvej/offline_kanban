@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useForm, FieldValues } from 'react-hook-form';
+import { useForm, FieldValues, set } from 'react-hook-form';
 import { 
   PlusIcon, 
   PencilIcon, 
@@ -92,7 +92,8 @@ export const KanbanColumnsSettings: React.FC = () => {
     showToast("Column deleted successfully!", "success");
   };
 
-  const handleMoveColumn = (columnId: number, direction: 'up' | 'down') => {
+  const handleMoveColumn = async (columnId: number, direction: 'up' | 'down') => {
+    setIsLoading(true);
     const columnIndex = columns.findIndex(col => col.id === columnId);
     if (
       (direction === 'up' && columnIndex === 0) ||
@@ -105,13 +106,19 @@ export const KanbanColumnsSettings: React.FC = () => {
     const targetIndex = direction === 'up' ? columnIndex - 1 : columnIndex + 1;
     
     [newColumns[columnIndex], newColumns[targetIndex]] = [newColumns[targetIndex], newColumns[columnIndex]];
-    
-    // Update positions
     newColumns.forEach((col, index) => {
       col.position = index + 1;
     });
     
-    setColumns(newColumns);
+    try {
+      await api.post('/settings/columns/reorder', { orders: newColumns.map(col => ({ id: col.id, position: col.position }))});
+      fetchColumns()
+    } catch (error) {
+      showToast("Failed to reorder columns.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  
   };
 
   const openEditModal = (column: KanbanColumn) => {
