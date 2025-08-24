@@ -100,6 +100,8 @@ func createTables(db *sql.DB) error {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title varchar NOT NULL,
             created_by INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             colors varchar NULL,
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
         );
@@ -264,16 +266,16 @@ func createTables(db *sql.DB) error {
 	}
 
 	// Update users table to add missing fields (will only add if not exists)
-	_, err = db.Exec(`ALTER TABLE users ADD COLUMN name TEXT;`)
+	db.Exec(`ALTER TABLE users ADD COLUMN name TEXT;`)
 	// Ignore error if column already exists
 
-	_, err = db.Exec(`ALTER TABLE users ADD COLUMN designation TEXT;`)
+	db.Exec(`ALTER TABLE users ADD COLUMN designation TEXT;`)
 	// Ignore error if column already exists
 
-	_, err = db.Exec(`ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`)
+	db.Exec(`ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`)
 	// Ignore error if column already exists
 
-	_, err = db.Exec(`ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;`)
+	db.Exec(`ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;`)
 	// Ignore error if column already exists
 
 	return nil

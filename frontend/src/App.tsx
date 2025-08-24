@@ -105,7 +105,7 @@ function App() {
       }
     };
     checkSetup();
-  }, []);
+  }, [showSetupModal]);
 
   return (
     <Router>

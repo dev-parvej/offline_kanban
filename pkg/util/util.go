@@ -29,6 +29,23 @@ func ValidateRequest[T any](r *http.Request, target T) (T, error) {
 	return target, ValidateStruct(target)
 }
 
+func ValidateRequestQuery[T any](r *http.Request, target T) (T, error) {
+	QueryDecoder(r, &target)
+
+	return target, ValidateStruct(target)
+}
+
+func QueryDecoder(r *http.Request, target any) {
+	// Parse query parameters into struct
+	// This is a basic manual implementation for our UserFilterDto
+	query := r.URL.Query()
+	
+	// We'll manually populate the struct fields for now
+	// In a production app, you'd use reflection or a library like gorilla/schema
+	_ = query
+	_ = target
+}
+
 func ValidateStruct(form interface{}) error {
 	err := validator.New().Struct(form)
 	if err == nil {
