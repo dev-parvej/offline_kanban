@@ -1,0 +1,319 @@
+package controller
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/dev-parvej/offline_kanban/middleware"
+	"github.com/dev-parvej/offline_kanban/pkg/database"
+	"github.com/dev-parvej/offline_kanban/pkg/dto"
+	"github.com/dev-parvej/offline_kanban/pkg/util"
+	"github.com/dev-parvej/offline_kanban/repository"
+	"github.com/gorilla/mux"
+)
+
+type Users struct {
+	router         *mux.Router
+	userRepository *repository.UserRepository
+	db             *database.Database
+}
+
+func UserController(router *mux.Router, db *database.Database) *Users {
+	return &Users{
+		router:         router,
+		userRepository: repository.NewUserRepository(db),
+		db:             db,
+	}
+}
+
+func (users *Users) Router() {
+	// User management routes (admin only)
+	adminRouter := users.router.PathPrefix("/admin/users").Subrouter()
+	adminRouter.Use(middleware.Authenticate)
+	adminRouter.Use(middleware.RequireRoot(users.db))
+
+	// Admin user CRUD operations
+	adminRouter.HandleFunc("", users.getAllUsers).Methods("GET")
+	adminRouter.HandleFunc("", users.createUser).Methods("POST")
+	adminRouter.HandleFunc("/{id:[0-9]+}", users.getUser).Methods("GET")
+	adminRouter.HandleFunc("/{id:[0-9]+}", users.updateUser).Methods("PUT")
+	adminRouter.HandleFunc("/{id:[0-9]+}/deactivate", users.deactivateUser).Methods("POST")
+}
+
+func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
+	// Parse and validate query parameters
+	filter := users.parseUserFilter(r)
+	
+	// Validate the filter struct
+	if err := util.ValidateStruct(filter); err != nil {
+		util.Res.Writer(w).Status(400).Data(err.Error())
+		return
+	}
+
+	// Get all users
+	allUsers, err := users.userRepository.GetAllUsers()
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	// Apply filters
+	filteredUsers := users.filterUsers(allUsers, filter)
+
+	// Apply pagination
+	total := len(filteredUsers)
+	start := (filter.Page - 1) * filter.Limit
+	end := start + filter.Limit
+	
+	if start >= total {
+		filteredUsers = []*repository.User{}
+	} else {
+		if end > total {
+			end = total
+		}
+		filteredUsers = filteredUsers[start:end]
+	}
+
+	// Create response
+	response := dto.NewUsersListResponse().FromUsers(filteredUsers)
+
+	// Add pagination info
+	responseData := map[string]interface{}{
+		"users": response.Users,
+		"total": total,
+		"page":  filter.Page,
+		"limit": filter.Limit,
+		"pages": (total + filter.Limit - 1) / filter.Limit,
+	}
+
+	util.Res.Writer(w).Status().Data(responseData)
+}
+
+// Parse query parameters into UserFilterDto
+func (users *Users) parseUserFilter(r *http.Request) dto.UserFilterDto {
+	query := r.URL.Query()
+	
+	filter := dto.UserFilterDto{
+		Search:   strings.TrimSpace(query.Get("search")),
+		IsActive: query.Get("is_active"),
+		IsRoot:   query.Get("is_root"),
+	}
+	
+	// Parse page with default
+	if page, err := strconv.Atoi(query.Get("page")); err == nil && page > 0 {
+		filter.Page = page
+	} else {
+		filter.Page = 1
+	}
+	
+	// Parse limit with default
+	if limit, err := strconv.Atoi(query.Get("limit")); err == nil && limit > 0 && limit <= 100 {
+		filter.Limit = limit
+	} else {
+		filter.Limit = 20
+	}
+	
+	return filter
+}
+
+// Filter users based on the validated filter DTO
+func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilterDto) []*repository.User {
+	var filtered []*repository.User
+	
+	for _, user := range allUsers {
+		// Apply search filter if provided
+		if filter.Search != "" {
+			search := strings.ToLower(filter.Search)
+			matchesSearch := false
+			
+			if strings.Contains(strings.ToLower(user.UserName), search) {
+				matchesSearch = true
+			}
+			if user.Name != nil && strings.Contains(strings.ToLower(*user.Name), search) {
+				matchesSearch = true
+			}
+			if user.Designation != nil && strings.Contains(strings.ToLower(*user.Designation), search) {
+				matchesSearch = true
+			}
+			
+			if !matchesSearch {
+				continue
+			}
+		}
+		
+		// Apply is_active filter if provided
+		if filter.IsActive != "" {
+			wantActive := filter.IsActive == "true"
+			if user.IsActive != wantActive {
+				continue
+			}
+		}
+		
+		// Apply is_root filter if provided
+		if filter.IsRoot != "" {
+			wantRoot := filter.IsRoot == "true"
+			if user.IsRoot != wantRoot {
+				continue
+			}
+		}
+		
+		filtered = append(filtered, user)
+	}
+	
+	return filtered
+}
+
+func (users *Users) getUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	user, err := users.userRepository.FindByID(id)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	response := dto.NewUserResponse().FromUser(user)
+	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
+		"user": response,
+	})
+}
+
+func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
+	createUserDto, errors := util.ValidateRequest(r, dto.CreateUserDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if username already exists
+	exists, err := users.userRepository.UsernameExists(createUserDto.UserName)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	if exists {
+		util.Res.Writer(w).Status(400).Data("Username already exists")
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := util.HashPassword(createUserDto.Password)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data("Failed to hash password")
+		return
+	}
+
+	// Create user (normal user, not root)
+	var name, designation *string
+	if createUserDto.Name != "" {
+		name = &createUserDto.Name
+	}
+	if createUserDto.Designation != "" {
+		designation = &createUserDto.Designation
+	}
+
+	user, err := users.userRepository.Create(
+		createUserDto.UserName,
+		hashedPassword,
+		name,
+		designation,
+		false, // isRoot = false for normal users
+	)
+
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := dto.NewUserResponse().FromUser(user)
+	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
+		"user": response,
+	})
+}
+
+func (users *Users) updateUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	updateUserDto, errors := util.ValidateRequest(r, dto.UpdateUserDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if user exists
+	_, err = users.userRepository.FindByID(id)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	// Update user profile
+	user, err := users.userRepository.UpdateProfile(id, updateUserDto.Name, updateUserDto.Designation)
+
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := dto.NewUserResponse().FromUser(user)
+	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
+		"user": response,
+	})
+}
+
+func (users *Users) deactivateUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Get current user ID to prevent self-deactivation
+	currentUserId := r.Header.Get("user_id")
+	if currentUserId == strconv.Itoa(id) {
+		util.Res.Writer(w).Status(400).Data("Cannot deactivate your own account")
+		return
+	}
+
+	// Check if user being deactivated is a root user
+	user, err := users.userRepository.FindByID(id)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	if user.IsRoot {
+		util.Res.Writer(w).Status(400).Data("Cannot deactivate root user")
+		return
+	}
+
+	err = users.userRepository.DeactivateUser(id)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"message": "User deactivated successfully",
+	})
+}

@@ -12,7 +12,7 @@ func Authenticate(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bearer := r.Header.Get("Authorization")
 
-		if bearer != "" {
+		if bearer == "" {
 			util.Res.Writer(w).Status403().Data(map[string]string{"message": "User is not logged in"})
 			return
 		}
