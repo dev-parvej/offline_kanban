@@ -22,9 +22,10 @@ type Column struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Related data (loaded separately)
-	CreatedByUser *User `json:"created_by_user,omitempty"`
-	TaskCount     int   `json:"task_count,omitempty"`
-	Position      int   `json:"position,omitempty"`
+	CreatedByUser *User        `json:"created_by_user,omitempty"`
+	TaskCount     int          `json:"task_count,omitempty"`
+	Position      int          `json:"position,omitempty"`
+	DeletedAt     sql.NullTime `json:"deleted_at,omitempty"`
 }
 
 type ColumnRepository struct {
@@ -41,7 +42,7 @@ func NewColumnRepository(db *database.Database) *ColumnRepository {
 func (cr *ColumnRepository) FindByID(id int) (*Column, error) {
 	column := &Column{}
 	query := `
-		SELECT id, title, created_by, colors, created_at, updated_at
+		SELECT id, title, created_by, colors, created_at, updated_at, position, deleted_at
 		FROM columns 
 		WHERE id = ?`
 
@@ -53,6 +54,7 @@ func (cr *ColumnRepository) FindByID(id int) (*Column, error) {
 		&column.CreatedAt,
 		&column.UpdatedAt,
 		&column.Position,
+		&column.DeletedAt,
 	)
 
 	if err != nil {
@@ -128,6 +130,56 @@ func (cr *ColumnRepository) Update(id int, title *string, colors *string) (*Colu
 	return cr.FindByID(id)
 }
 
+func (cr *ColumnRepository) Archive(id int) error {
+	query := `
+		UPDATE columns
+		SET deleted_at = CURRENT_TIMESTAMP
+		WHERE id = ?;
+	`
+
+	result, err := cr.db.Instance().Exec(query, id)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("column not found")
+	}
+
+	return nil
+}
+
+func (cr *ColumnRepository) UnArchive(id int) error {
+	query := `
+		UPDATE columns
+		SET deleted_at = NULL
+		WHERE id = ?;
+	`
+
+	result, err := cr.db.Instance().Exec(query, id)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("column not found")
+	}
+
+	return nil
+}
+
 // Delete column (only if no tasks)
 func (cr *ColumnRepository) Delete(id int) error {
 	// Check if column has tasks
@@ -161,7 +213,7 @@ func (cr *ColumnRepository) Delete(id int) error {
 // Get all columns
 func (cr *ColumnRepository) GetAll() ([]*Column, error) {
 	query := `
-		SELECT id, title, created_by, colors, created_at, updated_at
+		SELECT id, title, created_by, colors, created_at, updated_at, position
 		FROM columns 
 		ORDER BY created_at ASC`
 
@@ -175,14 +227,18 @@ func (cr *ColumnRepository) GetAll() ([]*Column, error) {
 }
 
 // Get columns with task counts
-func (cr *ColumnRepository) GetAllWithTaskCounts() ([]*Column, error) {
+func (cr *ColumnRepository) GetAllWithTaskCounts(showArchived bool) ([]*Column, error) {
 	query := `
 		SELECT c.id, c.title, c.created_by, c.colors, c.created_at, c.updated_at,
-		       COUNT(t.id) as task_count, c.position
+		       COUNT(t.id) as task_count, c.position, c.deleted_at
 		FROM columns c
-		LEFT JOIN tasks t ON c.id = t.column_id
-		GROUP BY c.id, c.title, c.created_by, c.colors, c.created_at, c.updated_at
-		ORDER BY c.position ASC`
+		LEFT JOIN tasks t ON c.id = t.column_id`
+
+	if !showArchived {
+		query += ` WHERE c.deleted_at IS NULL `
+	}
+
+	query += ` GROUP BY c.id, c.title, c.created_by, c.colors, c.created_at, c.updated_at ORDER BY c.position ASC`
 
 	rows, err := cr.db.Instance().Query(query)
 	if err != nil {
@@ -202,6 +258,7 @@ func (cr *ColumnRepository) GetAllWithTaskCounts() ([]*Column, error) {
 			&column.UpdatedAt,
 			&column.TaskCount,
 			&column.Position,
+			&column.DeletedAt,
 		)
 		if err != nil {
 			return nil, err

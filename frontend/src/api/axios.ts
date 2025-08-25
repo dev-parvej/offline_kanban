@@ -32,9 +32,8 @@ api.interceptors.response.use(
         const originalRequest = error.config;
 
         // If access token expired (401) and we haven't already tried to refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 403 && !Boolean(originalRequest._retry)) {
             originalRequest._retry = true;
-
             try {
                 const refreshToken = getRefreshToken();
                 if (!refreshToken) {
@@ -60,7 +59,6 @@ api.interceptors.response.use(
                 return api(originalRequest);
 
             } catch (refreshError) {
-                // Refresh failed, clear auth data and redirect to login
                 clearAuthTokens();
                 localStorage.removeItem('user_data');
                 window.location.href = '/login';

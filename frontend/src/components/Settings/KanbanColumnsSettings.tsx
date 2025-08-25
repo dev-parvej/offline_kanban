@@ -6,6 +6,7 @@ import {
   TrashIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  ArchiveBoxXMarkIcon,
 } from '@heroicons/react/24/outline';
 import FormGroup from '../ui/FormGroup';
 import { Input } from '../ui/Input';
@@ -14,12 +15,14 @@ import { Modal } from '../ui/Modal/Modal';
 import { useToast } from '../../hook';
 import { GripVerticalIcon } from '../ui/Icons/GripVerticalIcon';
 import { api } from '../../api';
+import { Checkbox } from '../ui/Checkbox';
 
 interface KanbanColumn {
   id?: number;
   title: string;
   position: number;
   colors?: string;
+  deleted_at?: { Time: string, Valid: boolean } | null;
 }
 
 export const KanbanColumnsSettings: React.FC = () => {
@@ -30,8 +33,10 @@ export const KanbanColumnsSettings: React.FC = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showArchiveUnarchiveModal, setShowArchiveUnarchiveModal] = useState(false);
   const [selectedColumn, setSelectedColumn] = useState<KanbanColumn | null>(null);
   const [isLoading, setIsLoading] = useState(false);  
+  const [showingArchived, setShowingArchived] = useState(false);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
@@ -82,14 +87,26 @@ export const KanbanColumnsSettings: React.FC = () => {
     }
   };
 
-  const handleDeleteColumn = (column: KanbanColumn) => {
+  const handleArchiveUnArchive = async(column: KanbanColumn) => {
     if (columns.length <= 1) {
       showToast("Cannot delete the last column.", "error");
       return;
     }
-    
-    setColumns(prev => prev.filter(col => col.id !== column.id));
-    showToast("Column deleted successfully!", "success");
+    setIsLoading(false);
+    const action = column.deleted_at?.Valid ? 'unarchive' : 'archive';``
+
+    try {
+      await api.delete(`/settings/columns/${column.id}`)
+      showToast(`Column ${action} successfully!`, "success");
+    } catch (error) {
+      showToast(`Failed to ${action} columns.`, "error");
+    } finally {
+      fetchColumns()
+      setSelectedColumn(null)
+      setIsLoading(false);
+      setShowArchiveUnarchiveModal(false);
+    }
+   
   };
 
   const handleMoveColumn = async (columnId: number, direction: 'up' | 'down') => {
@@ -130,14 +147,20 @@ export const KanbanColumnsSettings: React.FC = () => {
 
   const fetchColumns = async () => {
     setIsLoading(true)
-    const { data } = await api.get('/settings/columns/with-counts')
-    setColumns(data.columns)
-    setIsLoading(false)
+    try {
+      const url = showingArchived ? `/settings/columns/with-counts?archived=${showingArchived}` : '/settings/columns/with-counts'
+      const { data } = await api.get(url)
+      setColumns(data.columns)
+    } catch (e) {
+      showToast('Something went wrong, Please refresh')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchColumns();
-  }, []);
+  }, [showingArchived]);
 
   return (
     <div className="space-y-6">
@@ -160,9 +183,12 @@ export const KanbanColumnsSettings: React.FC = () => {
       {/* Columns List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Current Columns ({columns.length})
-          </h3>
+          <div className='flex justify-between items-center mb-4'>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Current Columns ({columns.length})
+            </h3>
+            { isLoading ? 'Loading...' : <Checkbox label='Show archived' checked={showingArchived} onChange={(checked) => setShowingArchived(checked)}  /> }
+          </div>
           
           <div className="space-y-2">
             {columns.map((column, index) => (
@@ -217,15 +243,22 @@ export const KanbanColumnsSettings: React.FC = () => {
                     <PencilIcon className="h-4 w-4" />
                   </button>
 
-                  {/* Delete */}
-                  <button
-                    onClick={() => handleDeleteColumn(column)}
+                  { column.deleted_at?.Valid ?
+                    <button className="flex items-center gap-2 rounded-xl p-2 hover:bg-gray-200 dark:hover:bg-gray-700"  onClick={() => {
+                      setSelectedColumn(column); setShowArchiveUnarchiveModal(true)
+                    }} >
+                      <ArchiveBoxXMarkIcon className="h-4 w-4 text-gray-700 dark:text-gray-200" />
+                    </button> : <button
+                    onClick={() => {
+                      setSelectedColumn(column); setShowArchiveUnarchiveModal(true)
+                    }}
                     disabled={columns.length <= 1}
                     className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
                     title="Delete Column"
                   >
                     <TrashIcon className="h-4 w-4" />
-                  </button>
+                  </button>}
+                  
                 </div>
               </div>
             ))}
@@ -325,6 +358,37 @@ export const KanbanColumnsSettings: React.FC = () => {
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showArchiveUnarchiveModal}
+        onClose={() => {
+          setShowArchiveUnarchiveModal(false);
+        }}
+        className="max-w-md w-full"
+      >
+        <div className="text-gray-900 dark:text-white">
+          <h3 className="text-lg font-medium mb-4">{ selectedColumn && !selectedColumn?.deleted_at?.Valid ? `Archive Column` : 'Unarchive Column'}</h3>
+          <p>Are you sure you want to { selectedColumn && !selectedColumn?.deleted_at?.Valid ? `archive` : 'urchive'} this column?.</p>
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowArchiveUnarchiveModal(false)}
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <Button 
+              type="button" 
+              variant={selectedColumn && !selectedColumn?.deleted_at?.Valid ? 'danger' : 'primary'}
+              onClick={() => {
+                  handleArchiveUnArchive(selectedColumn as KanbanColumn);
+              }}
+            >
+              {selectedColumn && !selectedColumn?.deleted_at?.Valid ? 'Archive' : 'Unarchive' }
+            </Button>
+          </div>
         </div>
       </Modal>
 

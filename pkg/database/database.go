@@ -279,6 +279,7 @@ func createTables(db *sql.DB) error {
 	// Ignore error if column already exists
 
 	db.Exec(`ALTER TABLE columns ADD COLUMN position INTEGER DEFAULT 0;`)
+	db.Exec(`ALTER TABLE columns ADD COLUMN deleted_at DATETIME NULL;`)
 
 	return nil
 }

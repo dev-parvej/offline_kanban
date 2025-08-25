@@ -190,7 +190,18 @@ func (columns *Columns) deleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = columns.columnRepository.Delete(id)
+	column, _ := columns.columnRepository.FindByID(id)
+
+	if column == nil {
+		util.Res.Writer(w).Status(400).Data("Column not found")
+		return
+	}
+
+	if column.DeletedAt.Valid {
+		err = columns.columnRepository.UnArchive(id)
+	} else {
+		err = columns.columnRepository.Archive(id)
+	}
 
 	if err != nil {
 		util.Res.Writer(w).Status(400).Data(err.Error())
@@ -203,7 +214,11 @@ func (columns *Columns) deleteColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (columns *Columns) getColumnsWithTaskCounts(w http.ResponseWriter, r *http.Request) {
-	cols, err := columns.columnRepository.GetAllWithTaskCounts()
+	// Check if "archived" query parameter is set to "true"
+	archivedParam := r.URL.Query().Get("archived")
+	showArchived := archivedParam == "true"
+
+	cols, err := columns.columnRepository.GetAllWithTaskCounts(showArchived)
 
 	if err != nil {
 		util.Res.Writer(w).Status(500).Data(err.Error())
