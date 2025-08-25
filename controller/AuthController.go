@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -116,7 +115,6 @@ func (auth *Auth) logout(w http.ResponseWriter, r *http.Request) {
 
 func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 	refreshDto, errors := util.ValidateRequest(r, dto.RefreshTokenDto{})
-	fmt.Println(refreshDto)
 	if errors != nil {
 		util.Res.Writer(w).Status422().Data(errors.Error())
 		return
