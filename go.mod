@@ -3,6 +3,7 @@ module github.com/dev-parvej/offline_kanban
 go 1.24.5
 
 require (
+	github.com/dev-parvej/js_array_method v1.0.1
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/handlers v1.5.2

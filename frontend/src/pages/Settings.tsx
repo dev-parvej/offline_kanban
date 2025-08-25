@@ -5,7 +5,7 @@ import { AppSettings } from '../components/Settings/AppSettings';
 
 export const Settings: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeSection, setActiveSection] = useState('app-settings');
+  const [activeSection, setActiveSection] = useState('kanban-columns');
 
   const renderActiveSection = () => {
     switch (activeSection) {

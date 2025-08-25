@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dev-parvej/js_array_method"
 	"github.com/dev-parvej/offline_kanban/middleware"
 	"github.com/dev-parvej/offline_kanban/pkg/database"
 	"github.com/dev-parvej/offline_kanban/pkg/dto"
@@ -189,7 +190,18 @@ func (columns *Columns) deleteColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = columns.columnRepository.Delete(id)
+	column, _ := columns.columnRepository.FindByID(id)
+
+	if column == nil {
+		util.Res.Writer(w).Status(400).Data("Column not found")
+		return
+	}
+
+	if column.DeletedAt.Valid {
+		err = columns.columnRepository.UnArchive(id)
+	} else {
+		err = columns.columnRepository.Archive(id)
+	}
 
 	if err != nil {
 		util.Res.Writer(w).Status(400).Data(err.Error())
@@ -202,7 +214,11 @@ func (columns *Columns) deleteColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (columns *Columns) getColumnsWithTaskCounts(w http.ResponseWriter, r *http.Request) {
-	cols, err := columns.columnRepository.GetAllWithTaskCounts()
+	// Check if "archived" query parameter is set to "true"
+	archivedParam := r.URL.Query().Get("archived")
+	showArchived := archivedParam == "true"
+
+	cols, err := columns.columnRepository.GetAllWithTaskCounts(showArchived)
 
 	if err != nil {
 		util.Res.Writer(w).Status(500).Data(err.Error())
@@ -236,15 +252,18 @@ func (columns *Columns) reorderColumns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate that all column IDs exist
-	for _, columnID := range reorderDto.ColumnIDs {
-		_, err := columns.columnRepository.FindByID(columnID)
-		if err != nil {
-			util.Res.Writer(w).Status(404).Data("One or more column IDs not found")
-			return
-		}
+	columnsIds := js_array_method.Map(reorderDto.Orders, func(column dto.ColumnsOrder, _ int) int {
+		return column.ID
+	})
+
+	columnEntities, _ := columns.columnRepository.FindByIDs(columnsIds)
+
+	if len(columnEntities) != len(reorderDto.Orders) {
+		util.Res.Writer(w).Status422().Data("One or more column IDs not found")
+		return
 	}
 
-	err := columns.columnRepository.Reorder(reorderDto.ColumnIDs)
+	err := columns.columnRepository.Reorder(reorderDto.Orders)
 
 	if err != nil {
 		util.Res.Writer(w).Status(500).Data(err.Error())

@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/dev-parvej/offline_kanban/repository"
+	"github.com/dev-parvej/offline_kanban/pkg/util"
 )
 
 type UserResponse struct {
@@ -21,16 +21,8 @@ func NewUserResponse() *UserResponse {
 	return &UserResponse{}
 }
 
-func (ur *UserResponse) FromUser(user *repository.User) *UserResponse {
-	ur.ID = user.ID
-	ur.UserName = user.UserName
-	ur.Name = user.Name
-	ur.Designation = user.Designation
-	ur.IsRoot = user.IsRoot
-	ur.IsActive = user.IsActive
-	ur.CreatedAt = user.CreatedAt
-	ur.UpdatedAt = user.UpdatedAt
-	return ur
+func (ur *UserResponse) FromUser(user map[string]any) *UserResponse {
+	return util.FillStruct(ur, user)
 }
 
 type UsersListResponse struct {
@@ -44,7 +36,7 @@ func NewUsersListResponse() *UsersListResponse {
 	}
 }
 
-func (ulr *UsersListResponse) FromUsers(users []*repository.User) *UsersListResponse {
+func (ulr *UsersListResponse) FromUsers(users []map[string]interface{}) *UsersListResponse {
 	ulr.Total = len(users)
 	for _, user := range users {
 		userResp := NewUserResponse().FromUser(user)

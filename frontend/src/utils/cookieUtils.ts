@@ -24,7 +24,7 @@ export const deleteCookie = (name: string): void => {
 
 export const setAuthTokens = (accessToken: string, refreshToken: string): void => {
   // Access token expires in 15 minutes (short-lived)
-  setCookie('access_token', accessToken, 1/96); // 1/96 day = 15 minutes
+  setCookie('access_token', accessToken, 1/1000); // 1/96 day = 15 minutes
   
   // Refresh token expires in 7 days (longer-lived)
   setCookie('refresh_token', refreshToken, 7);

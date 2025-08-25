@@ -124,16 +124,12 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 
 	_, err := util.Token().VerifyToken(refreshDto.RefreshToken)
 
-	fmt.Println(err.Error())
-
 	if err != nil {
 		util.Res.Writer(w).Status(401).Data(err.Error())
 		return
 	}
 
 	userToken, err := auth.refreshTokenRepository.FindByToken(refreshDto.RefreshToken)
-
-	fmt.Println(userToken, err.Error())
 
 	if err != nil {
 		util.Res.Writer(w).Status(401).Data(err.Error())
@@ -146,12 +142,12 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accessToken, newRefreshToken, _ := generateAccessAndRefreshToken(userToken.UserID)
-	fmt.Println(accessToken, newRefreshToken)
+
 	go auth.refreshTokenRepository.RevokeToken(refreshDto.RefreshToken)
 
 	util.Res.Writer(w).Status().Data(dto.NewRefreshTokenResponse().Create(map[string]interface{}{
-		"AccessToken":  accessToken,
-		"RefreshToken": newRefreshToken,
+		"access_token":  accessToken,
+		"refresh_token": newRefreshToken,
 	}))
 }
 

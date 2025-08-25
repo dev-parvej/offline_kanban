@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dev-parvej/js_array_method"
 	"github.com/dev-parvej/offline_kanban/middleware"
 	"github.com/dev-parvej/offline_kanban/pkg/database"
 	"github.com/dev-parvej/offline_kanban/pkg/dto"
@@ -44,7 +45,7 @@ func (users *Users) Router() {
 func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
 	// Parse and validate query parameters
 	filter := users.parseUserFilter(r)
-	
+
 	// Validate the filter struct
 	if err := util.ValidateStruct(filter); err != nil {
 		util.Res.Writer(w).Status(400).Data(err.Error())
@@ -65,7 +66,7 @@ func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
 	total := len(filteredUsers)
 	start := (filter.Page - 1) * filter.Limit
 	end := start + filter.Limit
-	
+
 	if start >= total {
 		filteredUsers = []*repository.User{}
 	} else {
@@ -76,7 +77,9 @@ func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create response
-	response := dto.NewUsersListResponse().FromUsers(filteredUsers)
+	response := dto.NewUsersListResponse().FromUsers(js_array_method.Map(filteredUsers, func(user *repository.User, _ int) map[string]interface{} {
+		return util.StructToMap(user)
+	}))
 
 	// Add pagination info
 	responseData := map[string]interface{}{
@@ -93,40 +96,40 @@ func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
 // Parse query parameters into UserFilterDto
 func (users *Users) parseUserFilter(r *http.Request) dto.UserFilterDto {
 	query := r.URL.Query()
-	
+
 	filter := dto.UserFilterDto{
 		Search:   strings.TrimSpace(query.Get("search")),
 		IsActive: query.Get("is_active"),
 		IsRoot:   query.Get("is_root"),
 	}
-	
+
 	// Parse page with default
 	if page, err := strconv.Atoi(query.Get("page")); err == nil && page > 0 {
 		filter.Page = page
 	} else {
 		filter.Page = 1
 	}
-	
+
 	// Parse limit with default
 	if limit, err := strconv.Atoi(query.Get("limit")); err == nil && limit > 0 && limit <= 100 {
 		filter.Limit = limit
 	} else {
 		filter.Limit = 20
 	}
-	
+
 	return filter
 }
 
 // Filter users based on the validated filter DTO
 func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilterDto) []*repository.User {
 	var filtered []*repository.User
-	
+
 	for _, user := range allUsers {
 		// Apply search filter if provided
 		if filter.Search != "" {
 			search := strings.ToLower(filter.Search)
 			matchesSearch := false
-			
+
 			if strings.Contains(strings.ToLower(user.UserName), search) {
 				matchesSearch = true
 			}
@@ -136,12 +139,12 @@ func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilt
 			if user.Designation != nil && strings.Contains(strings.ToLower(*user.Designation), search) {
 				matchesSearch = true
 			}
-			
+
 			if !matchesSearch {
 				continue
 			}
 		}
-		
+
 		// Apply is_active filter if provided
 		if filter.IsActive != "" {
 			wantActive := filter.IsActive == "true"
@@ -149,7 +152,7 @@ func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilt
 				continue
 			}
 		}
-		
+
 		// Apply is_root filter if provided
 		if filter.IsRoot != "" {
 			wantRoot := filter.IsRoot == "true"
@@ -157,10 +160,10 @@ func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilt
 				continue
 			}
 		}
-		
+
 		filtered = append(filtered, user)
 	}
-	
+
 	return filtered
 }
 
@@ -180,7 +183,7 @@ func (users *Users) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(user)
+	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
 	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
 		"user": response,
 	})
@@ -235,7 +238,7 @@ func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(user)
+	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
 	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
 		"user": response,
 	})
@@ -272,7 +275,7 @@ func (users *Users) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(user)
+	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
 	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
 		"user": response,
 	})

@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"github.com/go-playground/validator"
@@ -39,7 +40,7 @@ func QueryDecoder(r *http.Request, target any) {
 	// Parse query parameters into struct
 	// This is a basic manual implementation for our UserFilterDto
 	query := r.URL.Query()
-	
+
 	// We'll manually populate the struct fields for now
 	// In a production app, you'd use reflection or a library like gorilla/schema
 	_ = query
@@ -81,4 +82,24 @@ func FillStruct[T interface{}](s T, data map[string]interface{}) T {
 	json.Unmarshal(b, s)
 
 	return s
+}
+
+func ConvertToInterface[T any](slice []T) []any {
+	result := make([]any, len(slice))
+	for i, v := range slice {
+		result[i] = v
+	}
+	return result
+}
+
+func StructToMap(obj any) map[string]any {
+	result := make(map[string]any)
+	val := reflect.ValueOf(obj)
+	typ := reflect.TypeOf(obj)
+
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		result[field.Name] = val.Field(i).Interface()
+	}
+	return result
 }
