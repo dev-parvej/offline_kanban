@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { UsersList } from '../components/Users/UsersList';
-import { UserCreateModal } from '../components/Users/UserCreateModal';
-import { UserEditModal } from '../components/Users/UserEditModal';
 import { UserPasswordChangeModal } from '../components/Users/UserPasswordChangeModal';
 import { UserArchiveConfirmModal } from '../components/Users/UserArchiveConfirmModal';
+import { UserCreateEditModal } from '../components/Users/UserCreateEditModal';
 
 interface User {
   id: number;
@@ -159,14 +158,16 @@ export const Users: React.FC = () => {
       </div>
 
       {/* Create User Modal */}
-      <UserCreateModal
+      <UserCreateEditModal
+        mode='create'
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreateUser}
       />
 
       {/* Edit User Modal */}
-      <UserEditModal
+      <UserCreateEditModal
+        mode="edit"
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
