@@ -37,249 +37,82 @@ func InitDatabase() (*Database, error) {
 }
 
 func createTables(db *sql.DB) error {
-	// Users table
-	_, err := db.Exec(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            is_root BOOLEAN NOT NULL DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `)
-	if err != nil {
+	// Users table and trigger
+	if _, err := db.Exec(createUsersTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createUsersUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_users_updated_at;
-		CREATE TRIGGER update_users_updated_at
-		AFTER UPDATE ON users
-		FOR EACH ROW
-		BEGIN
-			UPDATE users
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
+	// Setup status table and trigger
+	if _, err := db.Exec(createSetupStatusTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createSetupStatusUpdateTrigger); err != nil {
 		return err
 	}
 
-	// Setup tracking table
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS setup_status (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            is_complete BOOLEAN NOT NULL DEFAULT 0,
-            completed_at DATETIME
-        )
-    `)
-	if err != nil {
+	// Columns table and trigger
+	if _, err := db.Exec(createColumnsTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createColumnsUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_setup_status_updated_at;
-		CREATE TRIGGER update_setup_status_updated_at
-		AFTER UPDATE ON setup_status
-		FOR EACH ROW
-		BEGIN
-			UPDATE setup_status
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
+	// Tasks table and trigger
+	if _, err := db.Exec(createTasksTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createTasksUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS columns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title varchar NOT NULL,
-            created_by INTEGER NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            colors varchar NULL,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-        );
-    `)
-
-	if err != nil {
+	// Comments table and trigger
+	if _, err := db.Exec(createCommentsTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createCommentsUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_columns_updated_at;
-		CREATE TRIGGER update_columns_updated_at
-		AFTER UPDATE ON columns
-		FOR EACH ROW
-		BEGIN
-			UPDATE columns
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
+	// Checklists table and trigger
+	if _, err := db.Exec(createChecklistsTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createChecklistsUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT,
-            column_id INTEGER NOT NULL,
-            assigned_to INTEGER,
-            created_by INTEGER NOT NULL,
-            due_date DATETIME,
-			priority varchar NULL,
-            position INTEGER NOT NULL,
-			weight INTEGER default 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL,
-            FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-        );
-    `)
-	if err != nil {
+	// Refresh tokens table and trigger
+	if _, err := db.Exec(createRefreshTokensTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createRefreshTokensUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_tasks_updated_at;
-		CREATE TRIGGER update_tasks_updated_at
-		AFTER UPDATE ON tasks
-		FOR EACH ROW
-		BEGIN
-			UPDATE tasks
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
+	// App settings table and trigger
+	if _, err := db.Exec(createAppSettingsTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createAppSettingsUpdateTrigger); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL,
-            task_id INTEGER NOT NULL,
-            created_by INTEGER NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-        );
-    `)
-	if err != nil {
+	// Insert default app settings
+	if _, err := db.Exec(insertDefaultAppSettings); err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_comments_updated_at;
-		CREATE TRIGGER update_comments_updated_at
-		AFTER UPDATE ON comments
-		FOR EACH ROW
-		BEGIN
-			UPDATE comments
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
+	// Activities table and trigger
+	if _, err := db.Exec(createActivitiesTable); err != nil {
 		return err
 	}
-
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS  checklists (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			title TEXT NOT NULL,
-			created_by INTEGER NOT NULL,
-			completed_by INTEGER,
-			task_id INTEGER NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE  SET NULL,
-			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE  SET NULL,
-			FOREIGN KEY (completed_by) REFERENCES users(id) ON DELETE SET NULL
-		);
-	`)
-
-	if err != nil {
+	if _, err := db.Exec(createActivitiesUpdateTrigger); err != nil {
 		return err
 	}
-
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_checklist_updated_at;
-		CREATE TRIGGER update_checklist_updated_at
-		AFTER UPDATE ON checklists
-		FOR EACH ROW
-		BEGIN
-			UPDATE checklists
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-
-	if err != nil {
-		return err
-	}
-
-	// Refresh tokens table
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token TEXT UNIQUE NOT NULL,
-            user_id INTEGER NOT NULL,
-            expires_at DATETIME NOT NULL,
-            is_revoked BOOLEAN NOT NULL DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-    `)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`
-		DROP TRIGGER IF EXISTS update_refresh_tokens_updated_at;
-		CREATE TRIGGER update_refresh_tokens_updated_at
-		AFTER UPDATE ON refresh_tokens
-		FOR EACH ROW
-		BEGIN
-			UPDATE refresh_tokens
-			SET updated_at = CURRENT_TIMESTAMP
-			WHERE id = OLD.id;
-		END;
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Update users table to add missing fields (will only add if not exists)
-	db.Exec(`ALTER TABLE users ADD COLUMN name TEXT;`)
-	// Ignore error if column already exists
-
-	db.Exec(`ALTER TABLE users ADD COLUMN designation TEXT;`)
-	// Ignore error if column already exists
-
-	db.Exec(`ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`)
-	// Ignore error if column already exists
-
-	db.Exec(`ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1;`)
-	// Ignore error if column already exists
-
-	db.Exec(`ALTER TABLE columns ADD COLUMN position INTEGER DEFAULT 0;`)
-	db.Exec(`ALTER TABLE columns ADD COLUMN deleted_at DATETIME NULL;`)
 
 	return nil
 }

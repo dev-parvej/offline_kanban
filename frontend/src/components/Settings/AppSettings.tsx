@@ -1,49 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, FieldValues } from 'react-hook-form';
 import FormGroup from '../ui/FormGroup';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hook';
 import { useTheme } from '../../contexts/ThemeContext';
+import { settingsService, AppSettings as ApiAppSettings } from '../../api';
 
 interface AppConfig {
   appName: string;
   appDescription: string;
   defaultTheme: 'light' | 'dark' | 'system';
   enableNotifications: boolean;
-  autoSaveInterval: number;
 }
 
 export const AppSettings: React.FC = () => {
   const { showToast, ToastContainer } = useToast();
   const { isDarkMode, toggleDarkMode, setDarkMode } = useTheme();
   
-  // Mock data - will be replaced with API calls
   const [appConfig, setAppConfig] = useState<AppConfig>({
     appName: 'Offline Kanban',
     appDescription: 'A powerful offline-first Kanban board application',
     defaultTheme: 'system',
-    enableNotifications: true,
-    autoSaveInterval: 30
+    enableNotifications: true
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   
-  const { register, handleSubmit, formState: { errors }, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, watch, reset } = useForm({
     defaultValues: appConfig
   });
 
   const watchedTheme = watch('defaultTheme');
 
+  // Load settings on component mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await settingsService.getSettings();
+      const config: AppConfig = {
+        appName: settings.app_name,
+        appDescription: settings.app_description || '',
+        defaultTheme: settings.default_theme,
+        enableNotifications: settings.enable_notifications
+      };
+      
+      setAppConfig(config);
+      reset(config); // Reset form with loaded data
+      
+      // Update document title
+      document.title = config.appName;
+      
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      showToast("Failed to load settings", "error");
+    } finally {
+      setIsLoadingInitial(false);
+    }
+  };
+
   const handleSaveSettings = async (data: FieldValues) => {
     setIsLoading(true);
     try {
+      const updateData = {
+        app_name: data.appName,
+        app_description: data.appDescription || undefined,
+        default_theme: data.defaultTheme,
+        enable_notifications: data.enableNotifications
+      };
+      
+      const updatedSettings = await settingsService.updateSettings(updateData);
+      
       const updatedConfig: AppConfig = {
-        appName: data.appName,
-        appDescription: data.appDescription,
-        defaultTheme: data.defaultTheme,
-        enableNotifications: data.enableNotifications,
-        autoSaveInterval: parseInt(data.autoSaveInterval)
+        appName: updatedSettings.app_name,
+        appDescription: updatedSettings.app_description || '',
+        defaultTheme: updatedSettings.default_theme,
+        enableNotifications: updatedSettings.enable_notifications
       };
       
       // Update local state
@@ -57,36 +93,43 @@ export const AppSettings: React.FC = () => {
       }
       // For 'system', the theme context will handle it automatically
       
+      // Update document title
+      document.title = updatedConfig.appName;
+      
       showToast("Settings saved successfully!", "success");
       
-      // TODO: Save to backend/localStorage
-      console.log('Saving app settings:', updatedConfig);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving settings:', error);
-      showToast("Failed to save settings. Please try again.", "error");
+      showToast(error.message || "Failed to save settings. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResetToDefaults = () => {
-    const defaults: AppConfig = {
-      appName: 'Offline Kanban',
-      appDescription: 'A powerful offline-first Kanban board application',
-      defaultTheme: 'system',
-      enableNotifications: true,
-      autoSaveInterval: 30
-    };
-    
-    setAppConfig(defaults);
-    // Reset form with new values
-    Object.entries(defaults).forEach(([key, value]) => {
-      document.getElementById(key)?.setAttribute('value', value.toString());
-    });
-    
-    showToast("Settings reset to defaults!", "success");
-  };
+
+  // Show loading state while fetching initial settings
+  if (isLoadingInitial) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            App Settings
+          </h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Configure your application preferences and behavior
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="animate-pulse space-y-6">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -228,49 +271,18 @@ export const AppSettings: React.FC = () => {
                     </label>
                   </div>
                 </FormGroup>
-
-                <FormGroup label="Auto-save Interval" errorMessage={errors.autoSaveInterval?.message as string}>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      id="autoSaveInterval"
-                      type="number"
-                      min="5"
-                      max="300"
-                      className="w-20"
-                      {...register("autoSaveInterval", {
-                        required: "Auto-save interval is required",
-                        min: { value: 5, message: "Minimum interval is 5 seconds" },
-                        max: { value: 300, message: "Maximum interval is 300 seconds" }
-                      })}
-                    />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">seconds</span>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    How often changes are automatically saved (5-300 seconds).
-                  </p>
-                </FormGroup>
               </div>
             </div>
 
             {/* Actions */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6 flex justify-between">
-              <button
-                type="button"
-                onClick={handleResetToDefaults}
-                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
+              <Button 
+                type="submit" 
+                isLoading={isLoading}
+                className="bg-blue-600 hover:bg-blue-700"
               >
-                Reset to Defaults
-              </button>
-              
-              <div className="flex space-x-4">
-                <Button 
-                  type="submit" 
-                  isLoading={isLoading}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Save Settings
-                </Button>
-              </div>
+                Save Settings
+              </Button>
             </div>
 
           </form>
@@ -297,12 +309,6 @@ export const AppSettings: React.FC = () => {
             <dt className="text-gray-500 dark:text-gray-400">Notifications:</dt>
             <dd className="text-gray-900 dark:text-white font-medium">
               {appConfig.enableNotifications ? 'Enabled' : 'Disabled'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500 dark:text-gray-400">Auto-save:</dt>
-            <dd className="text-gray-900 dark:text-white font-medium">
-              Every {appConfig.autoSaveInterval}s
             </dd>
           </div>
         </dl>
