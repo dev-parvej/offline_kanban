@@ -26,7 +26,7 @@ class SettingsService {
   // Get current application settings
   async getSettings(): Promise<AppSettings> {
     try {
-      const response = await api.get<SettingsResponse>('/settings');
+      const response = await api.get<SettingsResponse>('/admin/settings');
       return response.data.settings;
     } catch (error: any) {
       const message = error.response?.data?.message || 'Failed to load settings';
@@ -37,7 +37,7 @@ class SettingsService {
   // Update application settings (admin only)
   async updateSettings(settingsData: UpdateSettingsRequest): Promise<AppSettings> {
     try {
-      const response = await api.put<SettingsResponse>('/settings', settingsData);
+      const response = await api.put<SettingsResponse>('/admin/settings', settingsData);
       return response.data.settings;
     } catch (error: any) {
       const message = error.response?.data?.message || 'Failed to update settings';

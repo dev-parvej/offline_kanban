@@ -27,15 +27,14 @@ func SettingsController(router *mux.Router, db *database.Database) *Settings {
 
 func (s *Settings) Router() {
 	// Settings routes
-	settingsRouter := s.router.PathPrefix("/settings").Subrouter()
-	
-	// Public read access for settings
-	settingsRouter.HandleFunc("", s.getSettings).Methods("GET")
-	
-	// Admin-only route for updating settings
-	settingsRouter.HandleFunc("", s.updateSettings).Methods("PUT")
+	settingsRouter := s.router.PathPrefix("/admin/settings").Subrouter()
+
 	settingsRouter.Use(middleware.Authenticate)
 	settingsRouter.Use(middleware.RequireRoot(s.db))
+	settingsRouter.HandleFunc("", s.getSettings).Methods("GET")
+
+	settingsRouter.HandleFunc("", s.updateSettings).Methods("PUT")
+
 }
 
 // Get application settings (public access)
@@ -46,9 +45,8 @@ func (s *Settings) getSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewSettingsResponse().FromSettings(util.StructToMap(settings))
 	util.Res.Writer(w).Status().Data(map[string]*dto.SettingsResponse{
-		"settings": response,
+		"settings": (*dto.SettingsResponse)(settings),
 	})
 }
 
@@ -78,9 +76,8 @@ func (s *Settings) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewSettingsResponse().FromSettings(util.StructToMap(settings))
 	util.Res.Writer(w).Status().Data(map[string]*dto.SettingsResponse{
-		"settings": response,
+		"settings": (*dto.SettingsResponse)(settings),
 	})
 }
 

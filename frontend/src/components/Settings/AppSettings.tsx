@@ -277,14 +277,6 @@ export const AppSettings: React.FC = () => {
             {/* Actions */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6 flex justify-between">
               <Button 
-                type="button" 
-                onClick={loadSettings}
-                disabled={isLoading}
-                className="bg-gray-600 hover:bg-gray-700"
-              >
-                Reload Settings
-              </Button>
-              <Button 
                 type="submit" 
                 isLoading={isLoading}
                 className="bg-blue-600 hover:bg-blue-700"

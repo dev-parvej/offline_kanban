@@ -18,6 +18,7 @@ import { api } from './api';
 function AppContent() {
   const location = useLocation();
   const { user } = useAuth();
+  const [ appName, setAppName ] = useState('')
   
   const getMenuItems = () => {
     const baseItems = [
@@ -36,9 +37,18 @@ function AppContent() {
     return baseItems;
   };
 
+   const getAppName = async () => {
+    const { data: name } = await api.get('/setup/settings')
+    setAppName(name)
+  }
+
+  useEffect(() => {
+    getAppName()
+  })
+
   return (
     <div className="bg-white dark:bg-gray-900 min-h-screen">
-      <Navbar menuItems={getMenuItems()} />
+      <Navbar menuItems={getMenuItems()} brand={ appName ? appName : 'loading...' } />
       <Container isFluid>
         <Routes>
           {/* Public route */}
@@ -88,22 +98,23 @@ function AppContent() {
 function App() {
   const [showSetupModal, setShowSetupModal] = useState(false);
 
-  useEffect(() => {
-    const checkSetup = async () => {
-      try {
-        const { data: isSetupComplete } = await api.get('/setup/is-setup-complete');
+  const checkSetup = async () => {
+    try {
+      const { data: isSetupComplete } = await api.get('/setup/is-setup-complete');
 
-        if (!isSetupComplete) {
-          setShowSetupModal(true);
-        } else {
-          setShowSetupModal(false);
-        }
-      } catch (error) {
-        console.error('Error checking setup status:', error);
-        // If API fails, assume setup is needed
+      if (!isSetupComplete) {
         setShowSetupModal(true);
+      } else {
+        setShowSetupModal(false);
       }
-    };
+    } catch (error) {
+      console.error('Error checking setup status:', error);
+      // If API fails, assume setup is needed
+      setShowSetupModal(true);
+    }
+  };
+
+  useEffect(() => {
     checkSetup();
   }, [showSetupModal]);
 

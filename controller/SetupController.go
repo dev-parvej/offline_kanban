@@ -25,6 +25,7 @@ func (setup *Setup) Router() {
 	setupRouter := setup.router.PathPrefix("/setup").Subrouter()
 
 	setupRouter.HandleFunc("/is-setup-complete", setup.isSetupComplete).Methods("GET")
+	setupRouter.HandleFunc("/settings", setup.getSettings).Methods("GET")
 	setupRouter.HandleFunc("/root-user", setup.createRootUser).Methods("POST")
 }
 
@@ -39,6 +40,19 @@ func (setup *Setup) isSetupComplete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.Res.Writer(w).Status().Data(isComplete)
+}
+
+func (setup *Setup) getSettings(w http.ResponseWriter, r *http.Request) {
+	var appName string
+
+	err := setup.db.Instance().QueryRow("SELECT app_name FROM app_settings limit 1").Scan(&appName)
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data(false)
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(appName)
 }
 
 func (setup *Setup) createRootUser(w http.ResponseWriter, r *http.Request) {
