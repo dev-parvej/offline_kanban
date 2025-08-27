@@ -21,26 +21,7 @@ func NewUserResponse() *UserResponse {
 	return &UserResponse{}
 }
 
-func (ur *UserResponse) FromUser(user map[string]any) *UserResponse {
-	return util.FillStruct(ur, user)
-}
-
-type UsersListResponse struct {
-	Users []UserResponse `json:"users"`
-	Total int            `json:"total"`
-}
-
-func NewUsersListResponse() *UsersListResponse {
-	return &UsersListResponse{
-		Users: make([]UserResponse, 0),
-	}
-}
-
-func (ulr *UsersListResponse) FromUsers(users []map[string]interface{}) *UsersListResponse {
-	ulr.Total = len(users)
-	for _, user := range users {
-		userResp := NewUserResponse().FromUser(user)
-		ulr.Users = append(ulr.Users, *userResp)
-	}
-	return ulr
+func (userResponse *UserResponse) Create(data interface{}) *UserResponse {
+	util.FillStruct(&userResponse, data)
+	return userResponse
 }

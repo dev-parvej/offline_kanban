@@ -1,6 +1,8 @@
 import React from 'react';
 import { PencilIcon, KeyIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getUserInitials } from '../../util/user';
+import { formatDate } from '../../util/date-time';
 
 interface User {
   id: number;
@@ -17,33 +19,15 @@ interface UsersListProps {
   users: User[];
   onEdit: (user: User) => void;
   onPasswordChange: (user: User) => void;
-  onArchive: (user: User) => void;
+  onArchiveUnarchiveAction: (user: User) => void;
 }
 
 export const UsersList: React.FC<UsersListProps> = ({
   users,
   onEdit,
   onPasswordChange,
-  onArchive
+  onArchiveUnarchiveAction
 }) => {
-  const { isDarkMode } = useTheme();
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getUserInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase())
-      .join('')
-      .substring(0, 2);
-  };
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
       <div className="overflow-x-auto">
@@ -85,7 +69,7 @@ export const UsersList: React.FC<UsersListProps> = ({
                     <div className="flex-shrink-0 h-10 w-10">
                       <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                          {getUserInitials(user.name)}
+                          {getUserInitials(user.name ? user.name : user.username)}
                         </span>
                       </div>
                     </div>
@@ -161,7 +145,7 @@ export const UsersList: React.FC<UsersListProps> = ({
 
                     {/* Archive Button */}
                     <button
-                      onClick={() => onArchive(user)}
+                      onClick={() => onArchiveUnarchiveAction(user)}
                       className={`p-2 rounded-lg transition-colors ${
                         user.is_active
                           ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20'

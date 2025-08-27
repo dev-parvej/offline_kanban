@@ -6,6 +6,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hook';
 import { ExclamationTriangleIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
+import { getUserInitials } from '../../util/user';
 
 interface User {
   id: number;
@@ -111,11 +112,7 @@ export const UserArchiveConfirmModal: React.FC<UserArchiveConfirmModalProps> = (
             <div className="flex-shrink-0 h-10 w-10">
               <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  {user.name
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase())
-                    .join('')
-                    .substring(0, 2)}
+                  { getUserInitials(user.name || user.username) }
                 </span>
               </div>
             </div>

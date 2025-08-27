@@ -5,4 +5,5 @@ type CreateUserDto struct {
 	Password    string `validate:"required,lte=20,gt=3" json:"password"`
 	Name        string `validate:"omitempty,lte=100,gte=1" json:"name"`
 	Designation string `validate:"omitempty,lte=100,gte=1" json:"designation"`
+	IsRoot      bool   `validate:"omitempty" json:"is_root"`
 }
