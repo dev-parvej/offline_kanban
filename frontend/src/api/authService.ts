@@ -2,12 +2,14 @@ import { api } from './axios';
 import { setAuthTokens, clearAuthTokens } from '../utils/cookieUtils';
 
 export interface User {
-  id: string;
+  id: number;
+  name: string;
   username: string;
-  name?: string;
+  designation?: string;
   is_root: boolean;
-  is_active: boolean;
   created_at: string;
+  updated_at: string;
+  is_active: boolean;
 }
 
 export interface LoginRequest {

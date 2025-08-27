@@ -195,31 +195,31 @@ func (auth *Auth) getProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (auth *Auth) updateProfile(w http.ResponseWriter, r *http.Request) {
-	updateProfileDto, errors := util.ValidateRequest(r, dto.UpdateProfileDto{})
+	// updateProfileDto, errors := util.ValidateRequest(r, dto.UpdateProfileDto{})
 
-	if errors != nil {
-		util.Res.Writer(w).Status422().Data(errors.Error())
-		return
-	}
+	// if errors != nil {
+	// 	util.Res.Writer(w).Status422().Data(errors.Error())
+	// 	return
+	// }
 
-	userId := r.Header.Get("user_id")
-	_, err := auth.repository.FindByID(util.ParseInt(userId))
+	// userId := r.Header.Get("user_id")
+	// _, err := auth.repository.FindByID(util.ParseInt(userId))
 
-	if err != nil {
-		util.Res.Writer(w).Status(404).Data("User not found")
-		return
-	}
+	// if err != nil {
+	// 	util.Res.Writer(w).Status(404).Data("User not found")
+	// 	return
+	// }
+	// fmt.Println(updateProfileDto)
+	// //user, err := auth.repository.UpdateProfile(util.ParseInt(userId), &updateProfileDto.Name, &updateProfileDto.Designation)
 
-	user, err := auth.repository.UpdateProfile(util.ParseInt(userId), &updateProfileDto.Name, &updateProfileDto.Designation)
+	// if err != nil {
+	// 	util.Res.Writer(w).Status(404).Data("Unable to update the user")
+	// 	return
+	// }
 
-	if err != nil {
-		util.Res.Writer(w).Status(404).Data("Unable to update the user")
-		return
-	}
-
-	util.Res.Writer(w).Status().Data(map[string]*repository.User{
-		"user": user,
-	})
+	// util.Res.Writer(w).Status().Data(map[string]*repository.User{
+	// 	"user": user,
+	// })
 }
 
 func (auth *Auth) changePassword(w http.ResponseWriter, r *http.Request) {

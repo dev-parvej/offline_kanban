@@ -15,16 +15,18 @@ import (
 )
 
 type Users struct {
-	router         *mux.Router
-	userRepository *repository.UserRepository
-	db             *database.Database
+	router                 *mux.Router
+	userRepository         *repository.UserRepository
+	refreshTokenRepository *repository.RefreshTokenRepository
+	db                     *database.Database
 }
 
 func UserController(router *mux.Router, db *database.Database) *Users {
 	return &Users{
-		router:         router,
-		userRepository: repository.NewUserRepository(db),
-		db:             db,
+		router:                 router,
+		userRepository:         repository.NewUserRepository(db),
+		db:                     db,
+		refreshTokenRepository: repository.NewRefreshTokenRepository(db),
 	}
 }
 
@@ -39,7 +41,9 @@ func (users *Users) Router() {
 	adminRouter.HandleFunc("", users.createUser).Methods("POST")
 	adminRouter.HandleFunc("/{id:[0-9]+}", users.getUser).Methods("GET")
 	adminRouter.HandleFunc("/{id:[0-9]+}", users.updateUser).Methods("PUT")
-	adminRouter.HandleFunc("/{id:[0-9]+}/deactivate", users.deactivateUser).Methods("POST")
+	adminRouter.HandleFunc("/{id:[0-9]+}/archive", users.archiveUser).Methods("POST")
+	adminRouter.HandleFunc("/{id:[0-9]+}/unarchive", users.unarchiveUser).Methods("POST")
+	adminRouter.HandleFunc("/{id:[0-9]+}/update-password", users.updatePassword).Methods("POST")
 }
 
 func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
@@ -54,43 +58,15 @@ func (users *Users) getAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Get all users
 	allUsers, err := users.userRepository.GetAllUsers()
+
 	if err != nil {
-		util.Res.Writer(w).Status(500).Data(err.Error())
+		util.Res.Writer(w).Status(400).Data(err.Error())
 		return
 	}
 
-	// Apply filters
-	filteredUsers := users.filterUsers(allUsers, filter)
-
-	// Apply pagination
-	total := len(filteredUsers)
-	start := (filter.Page - 1) * filter.Limit
-	end := start + filter.Limit
-
-	if start >= total {
-		filteredUsers = []*repository.User{}
-	} else {
-		if end > total {
-			end = total
-		}
-		filteredUsers = filteredUsers[start:end]
-	}
-
-	// Create response
-	response := dto.NewUsersListResponse().FromUsers(js_array_method.Map(filteredUsers, func(user *repository.User, _ int) map[string]interface{} {
-		return util.StructToMap(user)
+	util.Res.Writer(w).Status().Data(js_array_method.Map(allUsers, func(user *repository.User, _ int) *dto.UserResponse {
+		return dto.NewUserResponse().Create(user)
 	}))
-
-	// Add pagination info
-	responseData := map[string]interface{}{
-		"users": response.Users,
-		"total": total,
-		"page":  filter.Page,
-		"limit": filter.Limit,
-		"pages": (total + filter.Limit - 1) / filter.Limit,
-	}
-
-	util.Res.Writer(w).Status().Data(responseData)
 }
 
 // Parse query parameters into UserFilterDto
@@ -120,53 +96,6 @@ func (users *Users) parseUserFilter(r *http.Request) dto.UserFilterDto {
 	return filter
 }
 
-// Filter users based on the validated filter DTO
-func (users *Users) filterUsers(allUsers []*repository.User, filter dto.UserFilterDto) []*repository.User {
-	var filtered []*repository.User
-
-	for _, user := range allUsers {
-		// Apply search filter if provided
-		if filter.Search != "" {
-			search := strings.ToLower(filter.Search)
-			matchesSearch := false
-
-			if strings.Contains(strings.ToLower(user.UserName), search) {
-				matchesSearch = true
-			}
-			if user.Name != nil && strings.Contains(strings.ToLower(*user.Name), search) {
-				matchesSearch = true
-			}
-			if user.Designation != nil && strings.Contains(strings.ToLower(*user.Designation), search) {
-				matchesSearch = true
-			}
-
-			if !matchesSearch {
-				continue
-			}
-		}
-
-		// Apply is_active filter if provided
-		if filter.IsActive != "" {
-			wantActive := filter.IsActive == "true"
-			if user.IsActive != wantActive {
-				continue
-			}
-		}
-
-		// Apply is_root filter if provided
-		if filter.IsRoot != "" {
-			wantRoot := filter.IsRoot == "true"
-			if user.IsRoot != wantRoot {
-				continue
-			}
-		}
-
-		filtered = append(filtered, user)
-	}
-
-	return filtered
-}
-
 func (users *Users) getUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -183,10 +112,7 @@ func (users *Users) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
-	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
-		"user": response,
-	})
+	util.Res.Writer(w).Status().Data(dto.NewUserResponse().Create(user))
 }
 
 func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +156,7 @@ func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
 		hashedPassword,
 		name,
 		designation,
-		false, // isRoot = false for normal users
+		util.IfThenElse(createUserDto.IsRoot, true, false).(bool), // isRoot = false for normal users
 	)
 
 	if err != nil {
@@ -238,7 +164,7 @@ func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
+	response := dto.NewUserResponse().Create(user)
 	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
 		"user": response,
 	})
@@ -246,12 +172,7 @@ func (users *Users) createUser(w http.ResponseWriter, r *http.Request) {
 
 func (users *Users) updateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
-
-	if err != nil {
-		util.Res.Writer(w).Status(400).Data("Invalid user ID")
-		return
-	}
+	id := util.ParseInt(vars["id"])
 
 	updateUserDto, errors := util.ValidateRequest(r, dto.UpdateUserDto{})
 
@@ -261,27 +182,27 @@ func (users *Users) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user exists
-	_, err = users.userRepository.FindByID(id)
+	_, err := users.userRepository.FindByID(id)
 	if err != nil {
 		util.Res.Writer(w).Status(404).Data(err.Error())
 		return
 	}
 
 	// Update user profile
-	user, err := users.userRepository.UpdateProfile(id, updateUserDto.Name, updateUserDto.Designation)
+	user, err := users.userRepository.UpdateProfile(id, updateUserDto.Name, updateUserDto.Designation, &updateUserDto.IsRoot)
 
 	if err != nil {
 		util.Res.Writer(w).Status(500).Data(err.Error())
 		return
 	}
 
-	response := dto.NewUserResponse().FromUser(util.StructToMap(user))
+	response := dto.NewUserResponse().Create(user)
 	util.Res.Writer(w).Status().Data(map[string]*dto.UserResponse{
 		"user": response,
 	})
 }
 
-func (users *Users) deactivateUser(w http.ResponseWriter, r *http.Request) {
+func (users *Users) archiveUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 
@@ -297,15 +218,10 @@ func (users *Users) deactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user being deactivated is a root user
-	user, err := users.userRepository.FindByID(id)
+	_, err = users.userRepository.FindByID(id)
+
 	if err != nil {
 		util.Res.Writer(w).Status(404).Data(err.Error())
-		return
-	}
-
-	if user.IsRoot {
-		util.Res.Writer(w).Status(400).Data("Cannot deactivate root user")
 		return
 	}
 
@@ -317,6 +233,79 @@ func (users *Users) deactivateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.Res.Writer(w).Status().Data(map[string]string{
-		"message": "User deactivated successfully",
+		"message": "User archived successfully",
+	})
+}
+
+func (users *Users) unarchiveUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Get current user ID to prevent self-deactivation
+	currentUserId := r.Header.Get("user_id")
+	if currentUserId == strconv.Itoa(id) {
+		util.Res.Writer(w).Status(400).Data("Cannot deactivate your own account")
+		return
+	}
+
+	user, err := users.userRepository.FindArchivedByID(id)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	if user.IsActive {
+		util.Res.Writer(w).Status(400).Data("User already unarchived")
+		return
+	}
+
+	err = users.userRepository.ActivateUser(id)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"message": "User unarchived successfully",
+	})
+}
+
+func (users *Users) updatePassword(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := util.ParseInt(vars["id"])
+	changePasswordDto, errors := util.ValidateRequest(r, dto.UpdatePasswordDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	user, err := users.userRepository.FindByID(id)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(map[string]string{"message": "User not found"})
+		return
+	}
+
+	hashed, err := util.HashPassword(changePasswordDto.NewPassword)
+
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data(map[string]string{"message": "Something went wrong"})
+		return
+	}
+
+	users.userRepository.UpdatePassword(user.ID, hashed)
+
+	go users.refreshTokenRepository.RevokeAllUserTokens(user.ID)
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"message": "Passowrd updated please ask user to re-login",
 	})
 }

@@ -131,7 +131,7 @@ export const UserCreateEditModal: React.FC<UserCreateEditModalProps> = ({
           </FormGroup>
 
           {/* Username Field */}
-          <FormGroup label="Username/Email" errorMessage={errors.username?.message as string}>
+          { !isEditMode && <FormGroup label="Username/Email" errorMessage={errors.username?.message as string}>
             <Input 
               placeholder="Enter username or email..."
               {...register("username", { 
@@ -146,7 +146,7 @@ export const UserCreateEditModal: React.FC<UserCreateEditModalProps> = ({
                 }
               })}
             />
-          </FormGroup>
+          </FormGroup> }
 
           {/* Designation Field */}
           <FormGroup label="Designation (Optional)">
