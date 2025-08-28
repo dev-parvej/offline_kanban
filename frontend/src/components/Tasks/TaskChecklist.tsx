@@ -260,7 +260,8 @@ export const TaskChecklist: React.FC<TaskChecklistProps> = ({
             <Button
               onClick={addNewItem}
               disabled={!newItemText.trim() || loading}
-              size="sm"
+              size="md"
+              type='button'
               className="flex items-center"
             >
               <PlusIcon className="h-4 w-4 mr-1" />

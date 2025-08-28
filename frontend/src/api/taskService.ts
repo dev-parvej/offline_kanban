@@ -1,4 +1,5 @@
 import { api } from "./axios";
+import { UserDto } from "./checklistService";
 
 // Types that match the backend DTOs
 export interface CreateTaskRequest {
@@ -37,12 +38,6 @@ export interface TaskFilters {
   page_size?: number;
   order_by?: 'position' | 'created_at' | 'updated_at' | 'title' | 'due_date';
   order_dir?: 'asc' | 'desc';
-}
-
-export interface UserDto {
-  id: number;
-  user_name: string;
-  name: string;
 }
 
 export interface TaskResponse {

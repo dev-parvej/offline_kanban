@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/dev-parvej/offline_kanban/config"
-	"github.com/dev-parvej/offline_kanban/pkg/util"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -119,29 +118,4 @@ func createTables(db *sql.DB) error {
 
 func (d *Database) Instance() *sql.DB {
 	return d.db
-}
-
-func (d *Database) AddUser(username, password string) error {
-	_, err := d.db.Exec(`
-        INSERT INTO users (username, password, is_root)
-        VALUES (?, ?, 0)
-    `, username, password)
-	return err
-}
-
-func (d *Database) ValidateUser(username, password string) (bool, bool, error) {
-	var storedPassword string
-	var isRoot bool
-	err := d.db.QueryRow(`
-        SELECT password, is_root FROM users WHERE username = ?
-    `, username).Scan(&storedPassword, &isRoot)
-
-	if err == sql.ErrNoRows {
-		return false, false, nil
-	}
-	if err != nil {
-		return false, false, err
-	}
-
-	return util.ComparePassword(storedPassword, password), isRoot, nil
 }

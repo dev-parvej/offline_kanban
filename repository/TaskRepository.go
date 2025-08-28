@@ -10,19 +10,19 @@ import (
 )
 
 type Task struct {
-	ID          int       `json:"id"`
-	Title       string    `json:"title"`
-	Description *string   `json:"description"`
-	ColumnID    int       `json:"column_id"`
-	AssignedTo  *int      `json:"assigned_to"`
-	CreatedBy   int       `json:"created_by"`
+	ID          int        `json:"id"`
+	Title       string     `json:"title"`
+	Description *string    `json:"description"`
+	ColumnID    int        `json:"column_id"`
+	AssignedTo  *int       `json:"assigned_to"`
+	CreatedBy   int        `json:"created_by"`
 	DueDate     *time.Time `json:"due_date"`
-	Priority    *string   `json:"priority"`
-	Position    int       `json:"position"`
-	Weight      int       `json:"weight"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	
+	Priority    *string    `json:"priority"`
+	Position    int        `json:"position"`
+	Weight      int        `json:"weight"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+
 	// Related data (loaded separately)
 	AssignedUser  *User   `json:"assigned_user,omitempty"`
 	CreatedByUser *User   `json:"created_by_user,omitempty"`
@@ -91,9 +91,9 @@ func (tr *TaskRepository) FindByID(id int) (*Task, error) {
 }
 
 // Create new task
-func (tr *TaskRepository) Create(title string, description *string, columnID, createdBy int, 
+func (tr *TaskRepository) Create(title string, description *string, columnID, createdBy int,
 	assignedTo *int, dueDate *time.Time, priority *string) (*Task, error) {
-	
+
 	// Get next position for the column
 	position, err := tr.getNextPosition(columnID)
 	if err != nil {
@@ -105,7 +105,7 @@ func (tr *TaskRepository) Create(title string, description *string, columnID, cr
 		                   due_date, priority, position, weight, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
-	result, err := tr.db.Instance().Exec(query, title, description, columnID, 
+	result, err := tr.db.Instance().Exec(query, title, description, columnID,
 		assignedTo, createdBy, dueDate, priority, position)
 	if err != nil {
 		return nil, err
@@ -120,9 +120,9 @@ func (tr *TaskRepository) Create(title string, description *string, columnID, cr
 }
 
 // Update task
-func (tr *TaskRepository) Update(id int, title *string, description *string, 
+func (tr *TaskRepository) Update(id int, title *string, description *string,
 	assignedTo *int, dueDate *time.Time, priority *string) (*Task, error) {
-	
+
 	query := `
 		UPDATE tasks 
 		SET title = COALESCE(?, title),
@@ -163,7 +163,7 @@ func (tr *TaskRepository) MoveToColumn(id, columnID, newPosition int) error {
 	_, err = tx.Exec(`
 		UPDATE tasks 
 		SET position = position + 1 
-		WHERE column_id = ? AND position >= ? AND id != ?`, 
+		WHERE column_id = ? AND position >= ? AND id != ?`,
 		columnID, newPosition, id)
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func (tr *TaskRepository) MoveToColumn(id, columnID, newPosition int) error {
 // Delete task
 func (tr *TaskRepository) Delete(id int) error {
 	query := `DELETE FROM tasks WHERE id = ?`
-	
+
 	result, err := tr.db.Instance().Exec(query, id)
 	if err != nil {
 		return err
@@ -214,7 +214,7 @@ func (tr *TaskRepository) GetByColumn(columnID int) ([]*Task, error) {
 // Get tasks with filters
 func (tr *TaskRepository) GetWithFilters(filters TaskFilters) ([]*Task, error) {
 	query, args := tr.buildFilterQuery(filters, false)
-	
+
 	rows, err := tr.db.Instance().Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (tr *TaskRepository) GetWithFilters(filters TaskFilters) ([]*Task, error) {
 // Count tasks with filters
 func (tr *TaskRepository) CountWithFilters(filters TaskFilters) (int, error) {
 	query, args := tr.buildFilterQuery(filters, true)
-	
+
 	var count int
 	err := tr.db.Instance().QueryRow(query, args...).Scan(&count)
 	return count, err
@@ -236,7 +236,7 @@ func (tr *TaskRepository) CountWithFilters(filters TaskFilters) (int, error) {
 // Get tasks with related data (joins)
 func (tr *TaskRepository) GetWithRelations(filters TaskFilters) ([]*Task, error) {
 	baseQuery := `
-		SELECT t.id, t.title, t.description, t.column_id, t.assigned_to, t.created_by, 
+		SELECT t.id, t.title, SUBSTR(t.description, 1, 400), t.column_id, t.assigned_to, t.created_by, 
 		       t.due_date, t.priority, t.position, t.weight, t.created_at, t.updated_at,
 		       au.username as assigned_username, au.name as assigned_name,
 		       cu.username as created_username, cu.name as created_name,
@@ -270,7 +270,7 @@ func (tr *TaskRepository) GetWithRelations(filters TaskFilters) ([]*Task, error)
 	if filters.Limit != nil {
 		baseQuery += " LIMIT ?"
 		args = append(args, *filters.Limit)
-		
+
 		if filters.Offset != nil {
 			baseQuery += " OFFSET ?"
 			args = append(args, *filters.Offset)
@@ -289,7 +289,7 @@ func (tr *TaskRepository) GetWithRelations(filters TaskFilters) ([]*Task, error)
 		var assignedUsername, assignedName, createdUsername, createdName, columnTitle sql.NullString
 
 		err := rows.Scan(
-			&task.ID, &task.Title, &task.Description, &task.ColumnID, 
+			&task.ID, &task.Title, &task.Description, &task.ColumnID,
 			&task.AssignedTo, &task.CreatedBy, &task.DueDate, &task.Priority,
 			&task.Position, &task.Weight, &task.CreatedAt, &task.UpdatedAt,
 			&assignedUsername, &assignedName, &createdUsername, &createdName,
@@ -326,7 +326,7 @@ func (tr *TaskRepository) GetWithRelations(filters TaskFilters) ([]*Task, error)
 func (tr *TaskRepository) getNextPosition(columnID int) (int, error) {
 	var maxPosition sql.NullInt64
 	query := `SELECT MAX(position) FROM tasks WHERE column_id = ?`
-	
+
 	err := tr.db.Instance().QueryRow(query, columnID).Scan(&maxPosition)
 	if err != nil {
 		return 0, err
@@ -371,7 +371,7 @@ func (tr *TaskRepository) buildFilterQuery(filters TaskFilters, isCount bool) (s
 		if filters.Limit != nil {
 			query += " LIMIT ?"
 			args = append(args, *filters.Limit)
-			
+
 			if filters.Offset != nil {
 				query += " OFFSET ?"
 				args = append(args, *filters.Offset)
@@ -440,7 +440,7 @@ func (tr *TaskRepository) scanTasks(rows *sql.Rows) ([]*Task, error) {
 	for rows.Next() {
 		task := &Task{}
 		err := rows.Scan(
-			&task.ID, &task.Title, &task.Description, &task.ColumnID, 
+			&task.ID, &task.Title, &task.Description, &task.ColumnID,
 			&task.AssignedTo, &task.CreatedBy, &task.DueDate, &task.Priority,
 			&task.Position, &task.Weight, &task.CreatedAt, &task.UpdatedAt,
 		)

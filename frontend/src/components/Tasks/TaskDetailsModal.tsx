@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TaskChecklist } from './TaskChecklist';
+import { CleanHtml } from '../../utils/cleanHtml';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ interface TaskDetailsModalProps {
     content?: {
       description?: string;
       priority?: 'low' | 'medium' | 'high' | 'urgent';
+      databaseId: number
     };
     parentId: string;
   } | null;
@@ -130,7 +132,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
               <div className={`px-2 py-1 rounded text-xs font-medium ${
                 isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
               }`}>
-                {task.id.toUpperCase()}
+                {task.id}
               </div>
               <div className="flex items-center gap-2">
                 <LinkIcon className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
@@ -159,7 +161,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
         <div className="flex overflow-hidden max-h-[80vh]">
           
           {/* Left Column - Main Content */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scroll-box">
             <div className="p-6 space-y-6">
               
               {/* Task Title */}
@@ -212,7 +214,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
                     }`}
                     onClick={() => setIsEditingDescription(true)}
                   >
-                    {task.content?.description || (
+                    {task.content?.description ? <CleanHtml html={task.content?.description} /> : (
                       <span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>
                         Add a description...
                       </span>
@@ -224,7 +226,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
               {/* Checklist */}
               <div>
                 <TaskChecklist 
-                  taskId={typeof task.id === 'number' ? task.id : parseInt(task.id)}
+                  taskId={typeof task.content?.databaseId === 'number' ? task.content.databaseId : 0}
                   editable={true}
                   showProgress={true}
                 />

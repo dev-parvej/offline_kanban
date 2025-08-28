@@ -1,5 +1,5 @@
 package dto
 
 type ToggleChecklistDto struct {
-	Completed bool `json:"completed" validate:"required"`
+	Completed bool `json:"completed"`
 }

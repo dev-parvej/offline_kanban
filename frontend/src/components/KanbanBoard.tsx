@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Kanban } from 'react-kanban-kit';
 import { useTheme } from '../contexts/ThemeContext';
 import { TaskDetailsModal } from './Tasks/TaskDetailsModal';
-import { getTasks, moveTask, TaskResponse } from '../api/taskService';
+import { getTask, getTasks, moveTask, TaskResponse } from '../api/taskService';
 import { getColumns, Column } from '../api/columnService';
+import { sliceString } from '../utils/util';
+import { CleanHtml } from '../utils/cleanHtml';
 
 interface KanbanNode {
   id: string;
@@ -17,6 +19,7 @@ interface KanbanNode {
     priority?: string;
     assignee?: string;
     dueDate?: string;
+    databaseId?: number
   };
 }
 
@@ -79,20 +82,7 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
 
         // Add tasks
         tasks.forEach(task => {
-          newDataSource[`task-${task.id}`] = {
-            id: `task-${task.id}`,
-            title: task.title,
-            parentId: `col-${task.column_id}`,
-            children: [],
-            totalChildrenCount: 0,
-            type: "card",
-            content: {
-              description: task.description || '',
-              priority: task.priority || '',
-              assignee: task.assigned_user?.name || task.assigned_user?.user_name || '',
-              dueDate: task.due_date || '',
-            },
-          };
+          newDataSource[`task-${task.id}`] = buildKanbanCard(task) as any
         });
 
         setDataSource(newDataSource);
@@ -109,6 +99,24 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
     refresh: fetchKanbanData
   }));
 
+  const buildKanbanCard = (task: TaskResponse) => {
+    return {
+      id: `task-${task.id}`,
+      title: task.title,
+      parentId: `col-${task.column_id}`,
+      children: [],
+      totalChildrenCount: 0,
+      type: "card",
+      content: {
+        description: task.description || '',
+        priority: task.priority || '',
+        assignee: task.assigned_user?.name || task.assigned_user?.user_name || '',
+        dueDate: task.due_date || '',
+        databaseId: task.id,
+      },
+    };
+  }
+
   useEffect(() => {
     fetchKanbanData();
   }, []);
@@ -120,7 +128,7 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
           <h3 className="font-semibold mb-2">{data.title}</h3>
           {data.content?.description && (
             <p className="text-sm mb-3 text-gray-600 dark:text-gray-300">
-              {data.content.description}
+              <CleanHtml html={sliceString(data.content.description)} />
             </p>
           )}
           <div className="card-meta">
@@ -184,27 +192,31 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
   return (
     <div style={kanbanStyles} className='pt-6'>
       <Kanban
-        dataSource={dataSource}
+        dataSource={dataSource as any}
         configMap={configMap}
         columnWrapperStyle={() => columnStyle}
-        onCardClick={(_, card) => {
-          setSelectedTask(card);
-          setIsTaskDetailsOpen(true);
+        onCardClick={async (_, card) => {
+          if(card.content?.databaseId) {
+            const {task} = await getTask(card.content.databaseId);
+            setSelectedTask(buildKanbanCard(task as any) as any);
+            setIsTaskDetailsOpen(true);
+          }
         }}
         onCardMove={async (move) => {
           try {
             // Extract task ID and column ID from the move data
             const taskId = parseInt(move.cardId.replace('task-', ''));
             const newColumnId = parseInt(move.toColumnId.replace('col-', ''));
+            console.log(taskId, newColumnId);
             
             // Calculate new position based on target index
             const targetColumn = dataSource[move.toColumnId];
-            const newPosition = move.targetIndex || targetColumn.children.length;
-
+            const newPosition = move.position || targetColumn.children.length;
+            
             // Call backend API to move the task
             await moveTask(taskId, {
               column_id: newColumnId,
-              new_position: newPosition
+              new_position: Number(newPosition)
             });
 
             // Update local state optimistically
@@ -218,9 +230,11 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
               }
 
               const sourceColumn = source[move.fromColumnId];
-              sourceColumn.children = sourceColumn.children.filter(
-                (id: string) => id !== move.cardId
-              );
+              if (move.toColumnId !== move.fromColumnId) {
+                sourceColumn.children = sourceColumn.children.filter(
+                  (id: string) => id !== move.cardId
+                );  
+              }
               sourceColumn.totalChildrenCount = sourceColumn.children.length;
 
               // Update the task's parentId
@@ -249,7 +263,7 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
           setIsTaskDetailsOpen(false);
           setSelectedTask(null);
         }}
-        task={selectedTask}
+        task={selectedTask as any}
       />
     </div>
   );

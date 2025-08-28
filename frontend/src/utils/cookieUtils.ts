@@ -26,8 +26,8 @@ export const setAuthTokens = (accessToken: string, refreshToken: string): void =
   // Access token expires in 15 minutes (short-lived)
   setCookie('access_token', accessToken, 1/96); // 1/96 day = 15 minutes
   
-  // Refresh token expires in 7 days (longer-lived)
-  setCookie('refresh_token', refreshToken, 7);
+  // Refresh token expires in 1 days (longer-lived)
+  setCookie('refresh_token', refreshToken, 1);
 };
 
 export const getAccessToken = (): string | null => {

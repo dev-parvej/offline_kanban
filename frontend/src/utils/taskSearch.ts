@@ -1,26 +1,11 @@
 import { TaskFilters } from '../components/Tasks/TaskSearchFilters';
 
-interface Task {
-  id: string;
-  title: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'active' | 'archived';
-  columnId: string;
-  columnName: string;
-  assignee?: string;
-  assigneeName?: string;
-  createdAt: string;
-  updatedAt: string;
-  dueDate?: string;
-  autoArchiveDays?: number;
-}
 
 export class TaskSearchEngine {
   /**
    * Search and filter tasks based on provided filters
    */
-  static searchTasks(tasks: Task[], filters: TaskFilters): Task[] {
+  static searchTasks(tasks: any[], filters: TaskFilters): any[] {
     let filteredTasks = [...tasks];
 
     // Text search in title and content
@@ -28,7 +13,7 @@ export class TaskSearchEngine {
       const query = filters.searchQuery.toLowerCase().trim();
       filteredTasks = filteredTasks.filter(task => {
         const titleMatch = task.title.toLowerCase().includes(query);
-        const contentMatch = task.content.toLowerCase().includes(query);
+        const contentMatch = (task as any).content.toLowerCase().includes(query);
         return titleMatch || contentMatch;
       });
     }
@@ -76,7 +61,7 @@ export class TaskSearchEngine {
     // Created date range filter
     if (filters.createdDateFrom || filters.createdDateTo) {
       filteredTasks = filteredTasks.filter(task => {
-        const taskCreatedDate = new Date(task.createdAt);
+        const taskCreatedDate = new Date((task as any).createdAt);
         const fromDate = filters.createdDateFrom ? new Date(filters.createdDateFrom) : null;
         const toDate = filters.createdDateTo ? new Date(filters.createdDateTo) : null;
         
@@ -104,7 +89,7 @@ export class TaskSearchEngine {
   /**
    * Get search suggestions based on existing tasks
    */
-  static getSearchSuggestions(tasks: Task[], query: string): string[] {
+  static getSearchSuggestions(tasks: any[], query: string): string[] {
     if (!query.trim() || query.length < 2) return [];
 
     const suggestions = new Set<string>();
@@ -113,15 +98,15 @@ export class TaskSearchEngine {
     tasks.forEach(task => {
       // Get title words
       const titleWords = task.title.toLowerCase().split(/\s+/);
-      titleWords.forEach(word => {
+      titleWords.forEach((word: any) => {
         if (word.includes(lowerQuery) && word.length > 2) {
           suggestions.add(word);
         }
       });
 
       // Get content words
-      const contentWords = task.content.toLowerCase().split(/\s+/);
-      contentWords.forEach(word => {
+      const contentWords = (task as any).content.toLowerCase().split(/\s+/);
+      contentWords.forEach((word: any) => {
         if (word.includes(lowerQuery) && word.length > 2) {
           suggestions.add(word);
         }
@@ -134,7 +119,7 @@ export class TaskSearchEngine {
   /**
    * Sort tasks by relevance score
    */
-  static sortByRelevance(tasks: Task[], searchQuery: string): Task[] {
+  static sortByRelevance(tasks: any[], searchQuery: string): any[] {
     if (!searchQuery.trim()) return tasks;
 
     const query = searchQuery.toLowerCase();
@@ -149,10 +134,10 @@ export class TaskSearchEngine {
   /**
    * Calculate relevance score for a task
    */
-  private static calculateRelevanceScore(task: Task, query: string): number {
+  private static calculateRelevanceScore(task: any, query: string): number {
     let score = 0;
     const lowerTitle = task.title.toLowerCase();
-    const lowerContent = task.content.toLowerCase();
+    const lowerContent = (task as any).content.toLowerCase();
 
     // Title matches get higher score
     if (lowerTitle.includes(query)) {
@@ -190,7 +175,7 @@ export class TaskSearchEngine {
     }
 
     // Recent tasks get slight boost
-    const daysSinceUpdate = (Date.now() - new Date(task.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+    const daysSinceUpdate = (Date.now() - new Date((task as any).updatedAt).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceUpdate < 7) {
       score += 1;
     }
@@ -201,7 +186,7 @@ export class TaskSearchEngine {
   /**
    * Get search statistics
    */
-  static getSearchStats(tasks: Task[], filteredTasks: Task[]): {
+  static getSearchStats(tasks: any[], filteredTasks: any[]): {
     total: number;
     filtered: number;
     active: number;
@@ -227,13 +212,13 @@ export class TaskSearchEngine {
       }
 
       // Priority counts
-      stats.byPriority[task.priority]++;
+      stats.byPriority[task.priority as keyof { low: 0, medium: 0, high: 0, urgent: 0 }]++;
 
       // Column counts
-      if (!stats.byColumn[task.columnName]) {
-        stats.byColumn[task.columnName] = 0;
+      if (!stats.byColumn[task.columnName as string]) {
+        stats.byColumn[task.columnName as string] = 0;
       }
-      stats.byColumn[task.columnName]++;
+      stats.byColumn[task.columnName as string]++;
     });
 
     return stats;
@@ -242,7 +227,7 @@ export class TaskSearchEngine {
   /**
    * Export filtered tasks to CSV
    */
-  static exportToCSV(tasks: Task[]): string {
+  static exportToCSV(tasks: any[]): string {
     const headers = [
       'ID',
       'Title', 
@@ -261,7 +246,7 @@ export class TaskSearchEngine {
       ...tasks.map(task => [
         task.id,
         `"${task.title.replace(/"/g, '""')}"`,
-        `"${task.content.replace(/"/g, '""')}"`,
+        `"${(task as any).content.replace(/"/g, '""')}"`,
         task.priority,
         task.status,
         task.columnName,

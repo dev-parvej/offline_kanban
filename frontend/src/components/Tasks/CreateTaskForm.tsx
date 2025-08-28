@@ -168,7 +168,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
             defaultValue=""
             rules={{
               maxLength: {
-                value: 1000,
+                value: 10000,
                 message: "Description must not exceed 1000 characters"
               }
             }}
@@ -256,16 +256,6 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Optional due date and time for the task.
           </p>
-        </FormGroup>
-
-        {/* Checklist Field */}
-        <FormGroup label="Task Checklist">
-          <TaskChecklist
-            items={checklistItems}
-            onChange={setChecklistItems}
-            editable={true}
-            showProgress={false}
-          />
         </FormGroup>
 
         {/* Action Buttons */}

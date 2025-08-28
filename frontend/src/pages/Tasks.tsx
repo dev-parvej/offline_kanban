@@ -8,15 +8,18 @@ import { useToast } from '../hook';
 import { getTasks, TaskResponse, TaskFilters as BackendTaskFilters } from '../api/taskService';
 
 // Use the TaskResponse interface from the API service, with legacy compatibility
-interface Task extends TaskResponse {
-  // Legacy fields for UI compatibility
-  content?: string;
-  status?: 'active' | 'archived';
-  columnName?: string;
+interface Task {
+  id: number;
+  title: string;
+  content: string;
+  priority?: string;
+  status: 'active' | 'archived';
+  columnId: string;
+  columnName: string;
   assignee?: string;
   assigneeName?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
   dueDate?: string;
   autoArchiveDays?: number;
 }
@@ -47,6 +50,7 @@ export const Tasks: React.FC = () => {
           // Legacy compatibility fields
           content: task.description || '',
           status: 'active' as const, // Assume all tasks are active for now
+          columnId: task.column_id?.toString() || '', // Ensure columnId is present and a string
           columnName: task.column_title || '',
           assignee: task.assigned_to?.toString(),
           assigneeName: task.assigned_user?.name || task.assigned_user?.user_name || '',
