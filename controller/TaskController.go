@@ -15,20 +15,22 @@ import (
 )
 
 type Tasks struct {
-	router           *mux.Router
-	taskRepository   *repository.TaskRepository
-	userRepository   *repository.UserRepository
-	columnRepository *repository.ColumnRepository
-	db               *database.Database
+	router               *mux.Router
+	taskRepository       *repository.TaskRepository
+	userRepository       *repository.UserRepository
+	columnRepository     *repository.ColumnRepository
+	checklistRepository  *repository.ChecklistRepository
+	db                   *database.Database
 }
 
 func TaskController(router *mux.Router, db *database.Database) *Tasks {
 	return &Tasks{
-		router:           router,
-		taskRepository:   repository.NewTaskRepository(db),
-		userRepository:   repository.NewUserRepository(db),
-		columnRepository: repository.NewColumnRepository(db),
-		db:               db,
+		router:              router,
+		taskRepository:      repository.NewTaskRepository(db),
+		userRepository:      repository.NewUserRepository(db),
+		columnRepository:    repository.NewColumnRepository(db),
+		checklistRepository: repository.NewChecklistRepository(db),
+		db:                  db,
 	}
 }
 
@@ -43,6 +45,13 @@ func (tasks *Tasks) Router() {
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.getTask).Methods("GET")
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.updateTask).Methods("PUT")
 	taskRouter.HandleFunc("/{id:[0-9]+}/move", tasks.moveTask).Methods("POST")
+	
+	// Checklist operations (all authenticated users)
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists", tasks.getTaskChecklists).Methods("GET")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists", tasks.createChecklist).Methods("POST")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}", tasks.updateChecklist).Methods("PUT")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}/toggle", tasks.toggleChecklist).Methods("POST")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}", tasks.deleteChecklist).Methods("DELETE")
 
 	// Admin-only task operations (root users only)
 	adminTaskRouter := tasks.router.PathPrefix("/admin/tasks").Subrouter()
@@ -589,5 +598,315 @@ func (tasks *Tasks) convertToResponseDto(task *repository.Task) dto.TaskResponse
 		response.ColumnTitle = task.ColumnTitle
 	}
 	
+	return response
+}
+
+// Checklist handlers
+func (tasks *Tasks) getTaskChecklists(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	// Check if task exists
+	_, err = tasks.taskRepository.FindByID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Task not found")
+		return
+	}
+
+	// Get checklists for the task
+	checklists, err := tasks.checklistRepository.FindByTaskID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	// Convert to response DTOs
+	checklistResponses := make([]dto.ChecklistResponseDto, len(checklists))
+	completedCount := 0
+	for i, checklist := range checklists {
+		checklistResponses[i] = tasks.convertChecklistToResponseDto(checklist)
+		if checklist.IsCompleted {
+			completedCount++
+		}
+	}
+
+	response := dto.ChecklistListResponseDto{
+		Checklists: checklistResponses,
+		TaskID:     taskID,
+		Total:      len(checklists),
+		Completed:  completedCount,
+	}
+
+	util.Res.Writer(w).Status().Data(response)
+}
+
+func (tasks *Tasks) createChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	createChecklistDto, errors := util.ValidateRequest(r, dto.CreateChecklistDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check if task exists
+	_, err = tasks.taskRepository.FindByID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Task not found")
+		return
+	}
+
+	// Validate that the taskID in the DTO matches the URL parameter
+	if createChecklistDto.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Task ID mismatch")
+		return
+	}
+
+	// Create checklist
+	checklist, err := tasks.checklistRepository.Create(createChecklistDto.Title, taskID, userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) updateChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	updateChecklistDto, errors := util.ValidateRequest(r, dto.UpdateChecklistDto{})
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check permissions: users can only edit their own checklists (unless they're root)
+	currentUser, err := tasks.userRepository.FindByID(userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data("Failed to get user info")
+		return
+	}
+
+	if !currentUser.IsRoot && existingChecklist.CreatedBy != userIdInt {
+		util.Res.Writer(w).Status(403).Data("You can only edit your own checklists")
+		return
+	}
+
+	// Update checklist
+	checklist, err := tasks.checklistRepository.Update(checklistID, updateChecklistDto.Title)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) toggleChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	toggleChecklistDto, errors := util.ValidateRequest(r, dto.ToggleChecklistDto{})
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Toggle checklist completion
+	checklist, err := tasks.checklistRepository.ToggleComplete(checklistID, userIdInt, toggleChecklistDto.Completed)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) deleteChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check permissions: users can only delete their own checklists (unless they're root)
+	currentUser, err := tasks.userRepository.FindByID(userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data("Failed to get user info")
+		return
+	}
+
+	if !currentUser.IsRoot && existingChecklist.CreatedBy != userIdInt {
+		util.Res.Writer(w).Status(403).Data("You can only delete your own checklists")
+		return
+	}
+
+	err = tasks.checklistRepository.Delete(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"message": "Checklist deleted successfully",
+	})
+}
+
+// Helper method to convert checklist to response DTO
+func (tasks *Tasks) convertChecklistToResponseDto(checklist *repository.Checklist) dto.ChecklistResponseDto {
+	response := dto.ChecklistResponseDto{
+		ID:          checklist.ID,
+		Title:       checklist.Title,
+		TaskID:      checklist.TaskID,
+		CreatedBy:   checklist.CreatedBy,
+		CompletedBy: checklist.CompletedBy,
+		IsCompleted: checklist.IsCompleted,
+		CreatedAt:   checklist.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   checklist.UpdatedAt.Format(time.RFC3339),
+	}
+
+	// Handle related user data
+	if checklist.CreatedByUser != nil {
+		name := ""
+		if checklist.CreatedByUser.Name != nil {
+			name = *checklist.CreatedByUser.Name
+		}
+		response.CreatedByUser = &dto.UserDto{
+			ID:       checklist.CreatedByUser.ID,
+			UserName: checklist.CreatedByUser.UserName,
+			Name:     name,
+		}
+	}
+
+	if checklist.CompletedByUser != nil {
+		name := ""
+		if checklist.CompletedByUser.Name != nil {
+			name = *checklist.CompletedByUser.Name
+		}
+		response.CompletedByUser = &dto.UserDto{
+			ID:       checklist.CompletedByUser.ID,
+			UserName: checklist.CompletedByUser.UserName,
+			Name:     name,
+		}
+	}
+
 	return response
 }

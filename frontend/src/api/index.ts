@@ -1,4 +1,6 @@
 export * from './axios'
 export * from './authService'
+export * from './checklistService'
 export * from './settingsService'
+export * from './taskService'
 export * from './userService'

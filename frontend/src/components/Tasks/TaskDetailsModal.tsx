@@ -13,12 +13,13 @@ import {
   MinusIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
+import { TaskChecklist } from './TaskChecklist';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: {
-    id: string;
+    id: string | number;
     title: string;
     content?: {
       description?: string;
@@ -36,13 +37,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
 
   if (!isOpen || !task) return null;
-
-  const mockChecklistItems = [
-    { id: '1', text: 'Research user requirements', completed: true },
-    { id: '2', text: 'Create wireframes', completed: true },
-    { id: '3', text: 'Design mockups', completed: false },
-    { id: '4', text: 'Get stakeholder approval', completed: false },
-  ];
 
   const mockComments = [
     {
@@ -229,46 +223,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
 
               {/* Checklist */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={`text-sm font-medium ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Checklist
-                  </h3>
-                  <span className={`text-xs ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
-                    {mockChecklistItems.filter(item => item.completed).length} of {mockChecklistItems.length} done
-                  </span>
-                </div>
-                
-                <div className="space-y-2">
-                  {mockChecklistItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 group">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className={`flex-1 ${
-                        item.completed 
-                          ? isDarkMode ? 'text-gray-500 line-through' : 'text-gray-400 line-through'
-                          : isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
-                        {item.text}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  <div className="flex items-center gap-3 mt-3">
-                    <PlusIcon className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                    <span className={`text-sm cursor-pointer hover:underline ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`}>
-                      Add an item
-                    </span>
-                  </div>
-                </div>
+                <TaskChecklist 
+                  taskId={typeof task.id === 'number' ? task.id : parseInt(task.id)}
+                  editable={true}
+                  showProgress={true}
+                />
               </div>
 
               {/* Comments & Activity Tabs */}
