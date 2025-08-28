@@ -5,39 +5,68 @@ export interface ChecklistItem {
   order: number;
 }
 
+// Frontend Task interface that matches backend TaskResponse
 export interface Task {
-  id: string;
+  id: number;
   title: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'active' | 'archived';
-  columnId: string;
-  columnName: string;
+  description?: string;
+  column_id: number;
+  assigned_to?: number;
+  created_by: number;
+  due_date?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  position: number;
+  weight: number;
+  created_at: string;
+  updated_at: string;
+  assigned_user?: {
+    id: number;
+    user_name: string;
+    name: string;
+  };
+  created_by_user?: {
+    id: number;
+    user_name: string;
+    name: string;
+  };
+  column_title?: string;
+  comment_count?: number;
+  // Legacy fields for backward compatibility with UI components
+  content?: string;
+  status?: 'active' | 'archived';
+  columnId?: string;
+  columnName?: string;
   assignee?: string;
   assigneeName?: string;
   assigneeEmail?: string;
-  checklist: ChecklistItem[];
-  createdAt: string;
-  updatedAt: string;
+  checklist?: ChecklistItem[];
+  createdAt?: string;
+  updatedAt?: string;
   dueDate?: string;
   autoArchiveDays?: number;
-  createdBy?: string;
   createdByName?: string;
 }
 
 export interface TaskCreateRequest {
   title: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  columnId: string;
-  assignee?: string;
-  checklist: ChecklistItem[];
-  dueDate?: string;
-  autoArchiveDays?: number;
+  description?: string;
+  column_id: number;
+  assigned_to?: number;
+  due_date?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
 }
 
-export interface TaskUpdateRequest extends Partial<TaskCreateRequest> {
-  id: string;
+export interface TaskUpdateRequest {
+  title?: string;
+  description?: string;
+  assigned_to?: number;
+  due_date?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+}
+
+export interface TaskMoveRequest {
+  column_id: number;
+  new_position: number;
 }
 
 export interface User {

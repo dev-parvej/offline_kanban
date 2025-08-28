@@ -5,19 +5,18 @@ import { TaskSearchResults } from '../components/Tasks/TaskSearchResults';
 import { TaskSearchEngine } from '../utils/taskSearch';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../hook';
+import { getTasks, TaskResponse, TaskFilters as BackendTaskFilters } from '../api/taskService';
 
-interface Task {
-  id: string;
-  title: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'active' | 'archived';
-  columnId: string;
-  columnName: string;
+// Use the TaskResponse interface from the API service, with legacy compatibility
+interface Task extends TaskResponse {
+  // Legacy fields for UI compatibility
+  content?: string;
+  status?: 'active' | 'archived';
+  columnName?: string;
   assignee?: string;
   assigneeName?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   dueDate?: string;
   autoArchiveDays?: number;
 }
@@ -25,104 +24,62 @@ interface Task {
 export const Tasks: React.FC = () => {
   const { showToast, ToastContainer } = useToast();
   
-  // Mock data - will be replaced with API calls
-  const [allTasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'Design user dashboard',
-      content: 'Create a comprehensive dashboard layout with charts and metrics for user analytics',
-      priority: 'high',
-      status: 'active',
-      columnId: 'col-2',
-      columnName: 'In Progress',
-      assignee: '1',
-      assigneeName: 'John Smith',
-      createdAt: '2024-01-15T10:30:00Z',
-      updatedAt: '2024-01-18T14:20:00Z',
-      dueDate: '2024-02-15T23:59:59Z'
-    },
-    {
-      id: '2',
-      title: 'Fix authentication bug',
-      content: 'Users are unable to login with their credentials. Investigation shows issue with token validation.',
-      priority: 'urgent',
-      status: 'active',
-      columnId: 'col-1',
-      columnName: 'To Do',
-      assignee: '2',
-      assigneeName: 'Sarah Johnson',
-      createdAt: '2024-02-01T09:15:00Z',
-      updatedAt: '2024-02-01T09:15:00Z',
-      dueDate: '2024-02-03T17:00:00Z'
-    },
-    {
-      id: '3',
-      title: 'Update documentation',
-      content: 'Review and update API documentation to reflect recent changes in v2.0 release',
-      priority: 'medium',
-      status: 'archived',
-      columnId: 'col-3',
-      columnName: 'Done',
-      assignee: '3',
-      assigneeName: 'Michael Brown',
-      createdAt: '2024-01-10T08:00:00Z',
-      updatedAt: '2024-01-25T16:30:00Z',
-      dueDate: '2024-01-30T23:59:59Z'
-    },
-    {
-      id: '4',
-      title: 'Implement dark mode',
-      content: 'Add dark theme support across all components with proper contrast ratios',
-      priority: 'low',
-      status: 'active',
-      columnId: 'col-1',
-      columnName: 'To Do',
-      createdAt: '2024-02-05T11:45:00Z',
-      updatedAt: '2024-02-05T11:45:00Z'
-    },
-    {
-      id: '5',
-      title: 'Database optimization',
-      content: 'Optimize slow queries and add proper indexing to improve performance',
-      priority: 'high',
-      status: 'archived',
-      columnId: 'col-3',
-      columnName: 'Done',
-      assignee: '1',
-      assigneeName: 'John Smith',
-      createdAt: '2024-01-20T13:20:00Z',
-      updatedAt: '2024-02-08T10:15:00Z'
-    },
-    {
-      id: '6',
-      title: 'Mobile responsive design',
-      content: 'Ensure all pages are fully responsive on mobile devices and tablets',
-      priority: 'medium',
-      status: 'active',
-      columnId: 'col-2',
-      columnName: 'In Progress',
-      assignee: '4',
-      assigneeName: 'Emily Davis',
-      createdAt: '2024-01-28T15:10:00Z',
-      updatedAt: '2024-02-10T09:30:00Z',
-      dueDate: '2024-02-20T23:59:59Z'
-    }
-  ]);
-
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>(allTasks);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [searchStats, setSearchStats] = useState<any>(null);
+
+  // Fetch all tasks from backend
+  useEffect(() => {
+    const fetchAllTasks = async () => {
+      try {
+        setInitialLoading(true);
+        const response = await getTasks({ 
+          page_size: 100,  // Get a large number of tasks for search
+          order_by: 'updated_at',
+          order_dir: 'desc'
+        });
+        
+        // Transform backend data to match UI expectations
+        const transformedTasks: Task[] = response.tasks.map(task => ({
+          ...task,
+          // Legacy compatibility fields
+          content: task.description || '',
+          status: 'active' as const, // Assume all tasks are active for now
+          columnName: task.column_title || '',
+          assignee: task.assigned_to?.toString(),
+          assigneeName: task.assigned_user?.name || task.assigned_user?.user_name || '',
+          createdAt: task.created_at,
+          updatedAt: task.updated_at,
+          dueDate: task.due_date || '',
+        }));
+        
+        setAllTasks(transformedTasks);
+        setFilteredTasks(transformedTasks);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+        showToast('Failed to load tasks. Please try again.', 'error');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchAllTasks();
+  }, []);
 
   // Load saved filters on component mount
   useEffect(() => {
-    const savedFilters = TaskSearchEngine.loadSearchFilters();
-    if (savedFilters) {
-      handleFiltersChange(savedFilters as TaskFilters);
+    if (allTasks.length > 0) {
+      const savedFilters = TaskSearchEngine.loadSearchFilters();
+      if (savedFilters) {
+        handleFiltersChange(savedFilters as TaskFilters);
+      }
     }
-  }, []);
+  }, [allTasks]);
 
   const handleFiltersChange = (filters: TaskFilters) => {
-    setLoading(false);
+    setLoading(true);
     
     // Simulate API delay
     setTimeout(() => {
@@ -163,11 +120,11 @@ export const Tasks: React.FC = () => {
 
   const handleArchiveTask = (task: Task) => {
     console.log('Archive task:', task);
-    // TODO: Archive/unarchive task
+    // TODO: Archive/unarchive task via API
     const action = task.status === 'active' ? 'archived' : 'unarchived';
     showToast(`Task ${action}: ${task.title}`, "success");
     
-    // Mock update
+    // Mock update for now
     const updatedTasks = filteredTasks.map(t => 
       t.id === task.id 
         ? { ...t, status: task.status === 'active' ? 'archived' as const : 'active' as const }
@@ -203,6 +160,15 @@ export const Tasks: React.FC = () => {
       showToast(statsMessage, "info");
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-gray-600 dark:text-gray-300">Loading tasks...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
