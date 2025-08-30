@@ -42,12 +42,12 @@ export interface ChecklistListResponse {
 
 // Checklist service functions
 export const getTaskChecklists = async (taskId: number): Promise<ChecklistListResponse> => {
-  const response = await api.get(`/tasks/${taskId}/checklists`);
+  const response = await api.get(`/features/tasks/${taskId}/checklists`);
   return response.data;
 };
 
 export const createChecklist = async (taskId: number, data: CreateChecklistRequest): Promise<{ checklist: ChecklistResponse }> => {
-  const response = await api.post(`/tasks/${taskId}/checklists`, data);
+  const response = await api.post(`/features/tasks/${taskId}/checklists`, data);
   return response.data;
 };
 
@@ -56,7 +56,7 @@ export const updateChecklist = async (
   checklistId: number, 
   data: UpdateChecklistRequest
 ): Promise<{ checklist: ChecklistResponse }> => {
-  const response = await api.put(`/tasks/${taskId}/checklists/${checklistId}`, data);
+  const response = await api.put(`/features/tasks/${taskId}/checklists/${checklistId}`, data);
   return response.data;
 };
 
@@ -65,11 +65,11 @@ export const toggleChecklist = async (
   checklistId: number, 
   data: ToggleChecklistRequest
 ): Promise<{ checklist: ChecklistResponse }> => {
-  const response = await api.post(`/tasks/${taskId}/checklists/${checklistId}/toggle`, data);
+  const response = await api.post(`/features/tasks/${taskId}/checklists/${checklistId}/toggle`, data);
   return response.data;
 };
 
 export const deleteChecklist = async (taskId: number, checklistId: number): Promise<{ message: string }> => {
-  const response = await api.delete(`/tasks/${taskId}/checklists/${checklistId}`);
+  const response = await api.delete(`/features/tasks/${taskId}/checklists/${checklistId}`);
   return response.data;
 };

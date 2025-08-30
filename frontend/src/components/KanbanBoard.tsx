@@ -19,7 +19,8 @@ interface KanbanNode {
     priority?: string;
     assignee?: string;
     dueDate?: string;
-    databaseId?: number
+    databaseId?: number;
+    column_id?: number
   };
 }
 
@@ -37,6 +38,7 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [columns, setColumns] = useState<Column[]>({} as Column[])
   
   const [dataSource, setDataSource] = useState<KanbanDataSource>({});
 
@@ -48,10 +50,12 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
 
         const [columnsResponse, tasksResponse] = await Promise.all([
           getColumns(),
-          getTasks({ order_by: 'position', order_dir: 'asc' })
+          getTasks({ order_by: 'position', order_dir: 'asc', page_size: 1000 })
         ]);
 
-        const columns = columnsResponse.columns;
+        setColumns(columnsResponse.columns)
+
+        const columnsEntities = columnsResponse.columns;
         const tasks = tasksResponse.tasks;
 
         // Build kanban data structure
@@ -59,14 +63,14 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
           root: {
             id: "root",
             title: "Root",
-            children: columns.map(col => `col-${col.id}`),
-            totalChildrenCount: columns.length,
+            children: columnsEntities.map(col => `col-${col.id}`),
+            totalChildrenCount: columnsEntities.length,
             parentId: null,
           }
         };
 
         // Add columns
-        columns.forEach(column => {
+        columnsEntities.forEach(column => {
           const columnTasks = tasks
             .filter(task => task.column_id === column.id)
             .sort((a, b) => a.position - b.position);
@@ -113,6 +117,7 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
         assignee: task.assigned_user?.name || task.assigned_user?.user_name || '',
         dueDate: task.due_date || '',
         databaseId: task.id,
+        column_id: task.column_id
       },
     };
   }
@@ -264,6 +269,8 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
           setSelectedTask(null);
         }}
         task={selectedTask as any}
+        columns={columns}
+        column={columns.find(col => col.id === selectedTask?.content?.column_id)}
       />
     </div>
   );

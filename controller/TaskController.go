@@ -37,7 +37,7 @@ func TaskController(router *mux.Router, db *database.Database) *Tasks {
 
 func (tasks *Tasks) Router() {
 	// All task routes require authentication
-	taskRouter := tasks.router.PathPrefix("/tasks").Subrouter()
+	taskRouter := tasks.router.PathPrefix("/features/tasks").Subrouter()
 	taskRouter.Use(middleware.Authenticate)
 
 	// Public task operations (all authenticated users)
@@ -46,6 +46,7 @@ func (tasks *Tasks) Router() {
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.getTask).Methods("GET")
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.updateTask).Methods("PUT")
 	taskRouter.HandleFunc("/{id:[0-9]+}/move", tasks.moveTask).Methods("POST")
+	taskRouter.HandleFunc("/{id:[0-9]+}/update-column", tasks.updateColumnId).Methods("POST")
 
 	// Checklist operations (all authenticated users)
 	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists", tasks.getTaskChecklists).Methods("GET")
@@ -426,6 +427,41 @@ func (tasks *Tasks) forceUpdateTask(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (tasks *Tasks) updateColumnId(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	updateTaskDto, errors := util.ValidateRequest(r, dto.UpdateTaskColumnDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	col, _ := tasks.columnRepository.GetTaskCount(*updateTaskDto.ColumnID)
+
+	// Update task
+	err = tasks.taskRepository.MoveToColumn(
+		id,
+		*updateTaskDto.ColumnID,
+		col,
+	)
+
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"task": "Task moved successfully",
+	})
+}
+
 // Helper methods
 func (tasks *Tasks) parseTaskFilter(r *http.Request) dto.TaskFilterDto {
 	query := r.URL.Query()
@@ -475,7 +511,7 @@ func (tasks *Tasks) parseTaskFilter(r *http.Request) dto.TaskFilterDto {
 		filter.Page = &defaultPage
 	}
 
-	if pageSize, err := strconv.Atoi(query.Get("page_size")); err == nil && pageSize > 0 && pageSize <= 100 {
+	if pageSize, err := strconv.Atoi(query.Get("page_size")); err == nil && pageSize > 0 {
 		filter.PageSize = &pageSize
 	} else {
 		defaultPageSize := 20

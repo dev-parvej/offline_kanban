@@ -69,7 +69,7 @@ export interface TaskListResponse {
 
 // Task service functions
 export const createTask = async (data: CreateTaskRequest): Promise<{ task: TaskResponse }> => {
-  const response = await api.post('/tasks', data);
+  const response = await api.post('/features/tasks', data);
   return response.data;
 };
 
@@ -84,22 +84,22 @@ export const getTasks = async (filters?: TaskFilters): Promise<TaskListResponse>
     });
   }
   
-  const response = await api.get(`/tasks${params.toString() ? `?${params.toString()}` : ''}`);
+  const response = await api.get(`/features/tasks${params.toString() ? `?${params.toString()}` : ''}`);
   return response.data;
 };
 
 export const getTask = async (id: number): Promise<{ task: TaskResponse }> => {
-  const response = await api.get(`/tasks/${id}`);
+  const response = await api.get(`/features/tasks/${id}`);
   return response.data;
 };
 
 export const updateTask = async (id: number, data: UpdateTaskRequest): Promise<{ task: TaskResponse }> => {
-  const response = await api.put(`/tasks/${id}`, data);
+  const response = await api.put(`/features/tasks/${id}`, data);
   return response.data;
 };
 
 export const moveTask = async (id: number, data: MoveTaskRequest): Promise<{ message: string }> => {
-  const response = await api.post(`/tasks/${id}/move`, data);
+  const response = await api.post(`/features/tasks/${id}/move`, data);
   return response.data;
 };
 
@@ -112,3 +112,8 @@ export const forceUpdateTask = async (id: number, data: UpdateTaskRequest): Prom
   const response = await api.put(`/admin/tasks/${id}/force-update`, data);
   return response.data;
 };
+
+export const updateTaskStatus = async (id: number, data: { column_id: number }) => {
+  const response = await api.post(`/features/tasks/${id}/update-column`, data);
+  return response.data;
+}

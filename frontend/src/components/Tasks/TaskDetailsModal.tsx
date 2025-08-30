@@ -15,6 +15,9 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { TaskChecklist } from './TaskChecklist';
 import { CleanHtml } from '../../utils/cleanHtml';
+import { Column } from '../../api/columnService';
+import { SearchSelect } from '../ui/Input';
+import { updateTaskStatus } from '../../api';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
@@ -25,18 +28,23 @@ interface TaskDetailsModalProps {
     content?: {
       description?: string;
       priority?: 'low' | 'medium' | 'high' | 'urgent';
-      databaseId: number
+      databaseId: number,
+      column_id: number
     };
     parentId: string;
   } | null;
+  columns?: Column[],
+  column?: Column
 }
 
-export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, task }) => {
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, task, columns, column }) => {
   const { isDarkMode } = useTheme();
   const [newComment, setNewComment] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
+  const [statusEditableMode, setStatusEditableMode] = useState(false)
+  const [selectedColumn, setSelectedColumn] = useState<Column|undefined>(column)
 
   if (!isOpen || !task) return null;
 
@@ -78,13 +86,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
     },
   ];
 
-  const getColumnName = (columnId: string) => {
-    const columnNames: Record<string, string> = {
-      'col-1': 'TO DO',
-      'col-2': 'IN PROGRESS',
-      'col-3': 'DONE',
-    };
-    return columnNames[columnId] || 'UNKNOWN';
+  const getColumnName = (columnId: number) => {
+    const column = columns?.find(col => col.id === columnId)
+    return column?.title;
   };
 
   const getPriorityIcon = (priority?: string) => {
@@ -112,11 +116,21 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
     }
   };
 
+  const saveStatus = async (col: Column) => {
+    await updateTaskStatus(task.content?.databaseId as number, { column_id: col?.id as number })
+  }
+
+  const closeModal = () => {
+    onClose()
+    setStatusEditableMode(false)
+    setSelectedColumn(undefined)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8">
       <div 
         className="absolute inset-0 bg-black bg-opacity-50"
-        onClick={onClose}
+        onClick={closeModal}
       />
       
       <div className={`relative w-full max-w-5xl max-h-[90vh] mx-4 rounded-md shadow-xl overflow-hidden ${
@@ -146,7 +160,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
                 <EllipsisHorizontalIcon className="w-5 h-5" />
               </button>
               <button
-                onClick={onClose}
+                onClick={closeModal}
                 className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${
                   isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -457,17 +471,29 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
                 }`}>
                   Status
                 </label>
-                <div className={`px-3 py-2 rounded cursor-pointer border ${
+                { !statusEditableMode ? <div className={`px-3 py-2 rounded cursor-pointer border ${
                   isDarkMode 
                     ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
                     : 'bg-white border-gray-300 hover:bg-gray-50'
-                }`}>
+                }`} onClick={() => setStatusEditableMode(true)}>
                   <span className={`text-sm font-medium ${
                     isDarkMode ? 'text-white' : 'text-gray-900'
                   }`}>
-                    {getColumnName(task.parentId)}
+                    {getColumnName(selectedColumn?.id as number || task.content?.column_id as number)}
                   </span>
-                </div>
+                </div> : 
+                <SearchSelect 
+                  value={ { label: selectedColumn?.title as string, value: String(selectedColumn?.id) } } 
+                  options={columns?.map(col => ({ label: col.title, value: String(col.id) })) || []} 
+                  open={statusEditableMode}
+                  onChange={({value}) => {
+                      const col = columns?.find(col => String(col.id) === value)
+                      setSelectedColumn(col)
+                      setStatusEditableMode(false)
+                      saveStatus(col as Column)
+                  }} 
+                /> }
+                
               </div>
 
               {/* Assignee */}
