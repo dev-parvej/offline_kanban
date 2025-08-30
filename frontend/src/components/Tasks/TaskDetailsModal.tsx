@@ -1,24 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { 
   XMarkIcon, 
-  PlusIcon, 
-  CheckIcon, 
   ClockIcon, 
   ChatBubbleLeftIcon, 
   LinkIcon,
   PaperClipIcon,
-  EllipsisHorizontalIcon,
-  ArrowUpIcon,
-  ExclamationTriangleIcon,
-  MinusIcon
+  EllipsisHorizontalIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TaskChecklist } from './TaskChecklist';
+import { TaskComments } from './TaskComments';
+import { TaskActivity } from './TaskActivity';
+import { TaskDetailsPanel } from './TaskDetailsPanel';
 import { CleanHtml } from '../../utils/cleanHtml';
 import { Column } from '../../api/columnService';
-import { SearchSelect } from '../ui/Input';
-import { updateTaskStatus } from '../../api';
-import { getUserInitials } from '../../util/user';
+import { updateTask } from '../../api/taskService';
+import RichTextEditor from '../ui/RichTextEditor';
+import { deleteImages, findRemovedImages } from '../../api/fileService';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
@@ -41,12 +39,11 @@ interface TaskDetailsModalProps {
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, task, columns, column }) => {
   const { isDarkMode } = useTheme();
-  const [newComment, setNewComment] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
-  const [statusEditableMode, setStatusEditableMode] = useState(false)
-  const [selectedColumn, setSelectedColumn] = useState<Column|undefined>(column)
+  const [currentTitle, setCurrentTitle] = useState(task?.title || '');
+  const [currentDescription, setCurrentDescription] = useState(task?.content?.description || '');
 
   if (!isOpen || !task) return null;
 
@@ -88,49 +85,76 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
     },
   ];
 
-  const getUserName =  () => {
-    return task.content?.full?.assigned_user?.name || task.content?.full?.assigned_user?.root
-  }
-
-  const getColumnName = (columnId: number) => {
-    const column = columns?.find(col => col.id === columnId)
-    return column?.title;
-  };
-
-  const getPriorityIcon = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return <ArrowUpIcon className="w-4 h-4 text-red-500" />;
-      case 'high':
-        return <ArrowUpIcon className="w-4 h-4 text-orange-500" />;
-      case 'medium':
-        return <MinusIcon className="w-4 h-4 text-yellow-500" />;
-      case 'low':
-        return <ArrowUpIcon className="w-4 h-4 text-green-500 rotate-180" />;
-      default:
-        return <MinusIcon className="w-4 h-4 text-gray-400" />;
-    }
-  };
-
-  const getPriorityText = (priority?: string) => {
-    switch (priority) {
-      case 'urgent': return 'Highest';
-      case 'high': return 'High';
-      case 'medium': return 'Medium';
-      case 'low': return 'Low';
-      default: return 'None';
-    }
-  };
-
-  const saveStatus = async (col: Column) => {
-    await updateTaskStatus(task.content?.databaseId as number, { column_id: col?.id as number })
-  }
-
   const closeModal = () => {
-    onClose()
-    setStatusEditableMode(false)
-    setSelectedColumn(undefined)
-  }
+    onClose();
+  };
+
+  const handleAddComment = (comment: string) => {
+    // TODO: Implement comment saving functionality
+    console.log('Adding comment:', comment);
+  };
+
+  const handleSaveTitle = async (newTitle: string) => {
+    if (newTitle.trim() && newTitle !== task?.title) {
+      try {
+        await updateTask(task.content?.databaseId as number, {
+          title: newTitle.trim()
+        });
+        setCurrentTitle(newTitle.trim());
+        // TODO: Update parent component or show success message
+      } catch (error) {
+        console.error('Failed to update task title:', error);
+        // Reset to original title on error
+        setCurrentTitle(task?.title || '');
+        // TODO: Show error message to user
+      }
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleSaveDescription = async (newDescription: string) => {
+    if (newDescription !== task?.content?.description) {
+      try {
+        // Find images that were removed from the description
+        const removedImages = findRemovedImages(task?.content?.description || '', newDescription);
+        
+        // Update the task description
+        await updateTask(task.content?.databaseId as number, {
+          description: newDescription
+        });
+        
+        // Delete removed images from the server
+        if (removedImages.length > 0) {
+          try {
+            const deleteResult = await deleteImages(removedImages);
+            console.log(`Cleaned up ${deleteResult.deleted_count} unused images`);
+            if (deleteResult.errors && deleteResult.errors.length > 0) {
+              console.warn('Some images could not be deleted:', deleteResult.errors);
+            }
+          } catch (error) {
+            console.error('Failed to clean up unused images:', error);
+            // Don't fail the save operation if image cleanup fails
+          }
+        }
+        
+        setCurrentDescription(newDescription);
+        // TODO: Update parent component or show success message
+      } catch (error) {
+        console.error('Failed to update task description:', error);
+        // Reset to original description on error
+        setCurrentDescription(task?.content?.description || '');
+        // TODO: Show error message to user
+      }
+    }
+    setIsEditingDescription(false);
+  };
+
+  const handleCancelDescription = () => {
+    // Reset to original description
+    setCurrentDescription(task?.content?.description || '');
+    setIsEditingDescription(false);
+  };
+
 console.log(task);
 
   return (
@@ -190,11 +214,20 @@ console.log(task);
                 {isEditingTitle ? (
                   <input
                     type="text"
-                    defaultValue={task.title}
+                    value={currentTitle}
+                    onChange={(e) => setCurrentTitle(e.target.value)}
                     className={`text-2xl font-semibold w-full bg-transparent border-none outline-none ${
                       isDarkMode ? 'text-white' : 'text-gray-900'
                     }`}
-                    onBlur={() => setIsEditingTitle(false)}
+                    onBlur={() => handleSaveTitle(currentTitle)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveTitle(currentTitle);
+                      } else if (e.key === 'Escape') {
+                        setCurrentTitle(task?.title || '');
+                        setIsEditingTitle(false);
+                      }
+                    }}
                     autoFocus
                   />
                 ) : (
@@ -204,7 +237,7 @@ console.log(task);
                     }`}
                     onClick={() => setIsEditingTitle(true)}
                   >
-                    {task.title}
+                    {currentTitle || task.title}
                   </h1>
                 )}
               </div>
@@ -217,17 +250,37 @@ console.log(task);
                   Description
                 </h3>
                 {isEditingDescription ? (
-                  <textarea
-                    defaultValue={task.content?.description || 'Add a description...'}
-                    className={`w-full p-3 rounded border ${
-                      isDarkMode
-                        ? 'bg-gray-800 border-gray-700 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    rows={4}
-                    onBlur={() => setIsEditingDescription(false)}
-                    autoFocus
-                  />
+                  <div>
+                    <RichTextEditor
+                      value={currentDescription}
+                      onChange={setCurrentDescription}
+                      placeholder="Add a description..."
+                      isDarkMode={isDarkMode}
+                    />
+                    {/* Save/Cancel Buttons */}
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleSaveDescription(currentDescription)}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          isDarkMode
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        }`}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelDescription}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          isDarkMode
+                            ? 'text-gray-400 hover:text-white hover:bg-gray-700'
+                            : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div
                     className={`p-3 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
@@ -235,7 +288,9 @@ console.log(task);
                     }`}
                     onClick={() => setIsEditingDescription(true)}
                   >
-                    {task.content?.description ? <CleanHtml html={task.content?.description} /> : (
+                    {currentDescription || task.content?.description ? (
+                      <CleanHtml html={currentDescription || task.content?.description || ''} />
+                    ) : (
                       <span className={isDarkMode ? 'text-gray-500' : 'text-gray-400'}>
                         Add a description...
                       </span>
@@ -297,315 +352,23 @@ console.log(task);
 
                 {/* Comments Tab */}
                 {activeTab === 'comments' && (
-                  <div className="space-y-6">
-                    {/* Comment Input */}
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'
-                      }`}>
-                        U
-                      </div>
-                      <div className="flex-1">
-                        <textarea
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Add a comment..."
-                          className={`w-full p-3 rounded border ${
-                            isDarkMode
-                              ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                          rows={3}
-                        />
-                        {newComment && (
-                          <div className="flex gap-2 mt-2">
-                            <button className={`px-3 py-1 text-sm rounded ${
-                              isDarkMode
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                : 'bg-blue-500 hover:bg-blue-600 text-white'
-                            }`}>
-                              Save
-                            </button>
-                            <button 
-                              className={`px-3 py-1 text-sm rounded ${
-                                isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-800'
-                              }`}
-                              onClick={() => setNewComment('')}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Comments List */}
-                    <div className="space-y-4">
-                      {mockComments.length === 0 ? (
-                        <div className={`text-center py-8 ${
-                          isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                        }`}>
-                          <ChatBubbleLeftIcon className={`w-12 h-12 mx-auto mb-3 ${
-                            isDarkMode ? 'text-gray-600' : 'text-gray-300'
-                          }`} />
-                          <p className="text-sm">No comments yet</p>
-                          <p className="text-xs mt-1">Be the first to comment on this task</p>
-                        </div>
-                      ) : (
-                        mockComments.map((comment) => (
-                          <div key={comment.id} className="flex gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                              isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-                            }`}>
-                              {comment.avatar}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className={`font-medium ${
-                                  isDarkMode ? 'text-white' : 'text-gray-900'
-                                }`}>
-                                  {comment.author}
-                                </span>
-                                <span className={`text-sm ${
-                                  isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                                }`}>
-                                  {comment.date}
-                                </span>
-                              </div>
-                              <div className={`p-3 rounded ${
-                                isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
-                              }`}>
-                                <p className={`${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`}>
-                                  {comment.content}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  <TaskComments 
+                    taskId={task.content?.databaseId as number}
+                  />
                 )}
 
                 {/* Activity Tab */}
                 {activeTab === 'activity' && (
-                  <div className="space-y-4">
-                    {/* Combined Activity and Comments Timeline */}
-                    {[...mockActivity, ...mockComments.map(comment => ({
-                      id: `comment-${comment.id}`,
-                      author: comment.author,
-                      avatar: comment.avatar,
-                      action: 'commented',
-                      timestamp: comment.timestamp,
-                      date: comment.date,
-                      type: 'comment' as const,
-                      content: comment.content,
-                    }))].sort((a, b) => {
-                      // Sort by timestamp (newest first)
-                      const timeValues: Record<string, number> = { '1h': 1, '2h': 2, '2d': 48, '3d': 72 };
-                      return (timeValues[a.timestamp] || 0) - (timeValues[b.timestamp] || 0);
-                    }).map((item: any) => (
-                      <div key={item.id} className="flex gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                          item.type === 'comment'
-                            ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-                            : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'
-                        }`}>
-                          {item.avatar}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`font-medium ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              {item.author}
-                            </span>
-                            <span className={`text-sm ${
-                              isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                            }`}>
-                              {item.action}
-                            </span>
-                            <span className={`text-sm ${
-                              isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                            }`}>
-                              {item.timestamp}
-                            </span>
-                          </div>
-                          {item.type === 'comment' && (
-                            <div className={`mt-2 p-3 rounded ${
-                              isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
-                            }`}>
-                              <p className={`text-sm ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                              }`}>
-                                {(item as any).content}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {mockActivity.length === 0 && mockComments.length === 0 && (
-                      <div className={`text-center py-8 ${
-                        isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                      }`}>
-                        <ClockIcon className={`w-12 h-12 mx-auto mb-3 ${
-                          isDarkMode ? 'text-gray-600' : 'text-gray-300'
-                        }`} />
-                        <p className="text-sm">No activity yet</p>
-                        <p className="text-xs mt-1">Activity will appear here as the task progresses</p>
-                      </div>
-                    )}
-                  </div>
+                  <TaskActivity 
+                    taskId={task.content?.databaseId as number}
+                  />
                 )}
               </div>
             </div>
           </div>
 
           {/* Right Column - Details Panel */}
-          <div className={`w-80 border-l overflow-y-auto ${
-            isDarkMode ? 'border-gray-700 bg-gray-850' : 'border-gray-200 bg-gray-50'
-          }`}>
-            <div className="p-6 space-y-6">
-              
-              {/* Status */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Status
-                </label>
-                { !statusEditableMode ? <div className={`px-3 py-2 rounded cursor-pointer border ${
-                  isDarkMode 
-                    ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50'
-                }`} onClick={() => setStatusEditableMode(true)}>
-                  <span className={`text-sm font-medium ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    {getColumnName(selectedColumn?.id as number || task.content?.column_id as number)}
-                  </span>
-                </div> : 
-                <SearchSelect 
-                  value={ { label: selectedColumn?.title as string, value: String(selectedColumn?.id) } } 
-                  options={columns?.map(col => ({ label: col.title, value: String(col.id) })) || []} 
-                  open={statusEditableMode}
-                  onChange={({value}) => {
-                      const col = columns?.find(col => String(col.id) === value)
-                      setSelectedColumn(col)
-                      setStatusEditableMode(false)
-                      saveStatus(col as Column)
-                  }} 
-                /> }
-                
-              </div>
-
-              {/* Assignee */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Assignee
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                    isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-                  }`}>
-                    {task.content?.full?.assigned_to ? getUserInitials(getUserName()) : '' }
-                  </div>
-                  <span className={`text-sm ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    { getUserName() ?? '' }
-                  </span>
-                </div>
-              </div>
-
-              {/* Priority */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Priority
-                </label>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer border ${
-                  isDarkMode 
-                    ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50'
-                }`}>
-                  {getPriorityIcon(task.content?.priority)}
-                  <span className={`text-sm ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    {getPriorityText(task.content?.priority)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Reporter */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Reporter
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                    isDarkMode ? 'bg-green-600 text-white' : 'bg-green-500 text-white'
-                  }`}>
-                    JS
-                  </div>
-                  <span className={`text-sm ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    Jane Smith
-                  </span>
-                </div>
-              </div>
-
-              {/* Created */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Created
-                </label>
-                <div className={`text-sm ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  3 days ago
-                </div>
-                <div className={`text-xs ${
-                  isDarkMode ? 'text-gray-500' : 'text-gray-500'
-                }`}>
-                  Monday at 9:00 AM
-                </div>
-              </div>
-
-              {/* Updated */}
-              <div>
-                <label className={`block text-xs font-medium mb-2 uppercase tracking-wide ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Updated
-                </label>
-                <div className={`text-sm ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  2 hours ago
-                </div>
-                <div className={`text-xs ${
-                  isDarkMode ? 'text-gray-500' : 'text-gray-500'
-                }`}>
-                  Today at 2:30 PM
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <TaskDetailsPanel task={task} columns={columns} column={column} />
         </div>
       </div>
     </div>

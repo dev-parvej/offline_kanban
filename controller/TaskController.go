@@ -12,6 +12,7 @@ import (
 	"github.com/dev-parvej/offline_kanban/pkg/dto"
 	"github.com/dev-parvej/offline_kanban/pkg/util"
 	"github.com/dev-parvej/offline_kanban/repository"
+	"github.com/dev-parvej/offline_kanban/service"
 	"github.com/gorilla/mux"
 )
 
@@ -21,6 +22,7 @@ type Tasks struct {
 	userRepository      *repository.UserRepository
 	columnRepository    *repository.ColumnRepository
 	checklistRepository *repository.ChecklistRepository
+	taskService         *service.TaskService
 	db                  *database.Database
 }
 
@@ -31,6 +33,7 @@ func TaskController(router *mux.Router, db *database.Database) *Tasks {
 		userRepository:      repository.NewUserRepository(db),
 		columnRepository:    repository.NewColumnRepository(db),
 		checklistRepository: repository.NewChecklistRepository(db),
+		taskService:         service.NewTaskService(db),
 		db:                  db,
 	}
 }
@@ -185,8 +188,8 @@ func (tasks *Tasks) createTask(w http.ResponseWriter, r *http.Request) {
 		dueDate = &parsedDate
 	}
 
-	// Create task
-	task, err := tasks.taskRepository.Create(
+	// Create task using service (handles activity tracking)
+	task, err := tasks.taskService.CreateTask(
 		createTaskDto.Title,
 		createTaskDto.Description,
 		createTaskDto.ColumnID,
@@ -270,14 +273,16 @@ func (tasks *Tasks) updateTask(w http.ResponseWriter, r *http.Request) {
 		dueDate = &parsedDate
 	}
 
-	// Update task
-	task, err := tasks.taskRepository.Update(
+	// Update task using service (handles activity tracking)
+	task, err := tasks.taskService.UpdateTask(
 		id,
+		userIdInt,
 		updateTaskDto.Title,
 		updateTaskDto.Description,
 		updateTaskDto.AssignedTo,
 		dueDate,
 		updateTaskDto.Priority,
+		updateTaskDto.ColumnID,
 	)
 
 	if err != nil {

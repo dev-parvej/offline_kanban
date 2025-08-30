@@ -36,4 +36,20 @@ export const archiveUser = async (id: number) => {
 
 export const unArchiveUser = async (id: number) => {
     await api.post(`/admin/users/${id}/unarchive`)
+}
+
+export interface UserSearchResult {
+    id: number;
+    username: string;
+    name?: string;
+}
+
+export const searchUsers = async (query: string): Promise<UserSearchResult[]> => {
+    const response = await api.get(`/users/search?q=${encodeURIComponent(query)}`);
+    return response.data;
+}
+
+export const getInitialUsers = async (): Promise<UserSearchResult[]> => {
+    const response = await api.get('/users/search?q=');
+    return response.data;
 } 

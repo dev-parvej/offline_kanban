@@ -17,6 +17,7 @@ export interface UpdateTaskRequest {
   assigned_to?: number;
   due_date?: string; // ISO format: 2024-01-15T10:30:00Z
   priority?: 'low' | 'medium' | 'high' | 'urgent';
+  column_id?: number;
 }
 
 export interface MoveTaskRequest {

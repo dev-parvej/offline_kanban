@@ -1,2 +1,2 @@
 export { Input } from './Input';
-export { SearchSelect } from './Select'
+export * from './Select'

@@ -31,6 +31,11 @@ func UserController(router *mux.Router, db *database.Database) *Users {
 }
 
 func (users *Users) Router() {
+	// User search endpoint (available to all authenticated users)
+	searchRouter := users.router.PathPrefix("/users").Subrouter()
+	searchRouter.Use(middleware.Authenticate)
+	searchRouter.HandleFunc("/search", users.searchUsers).Methods("GET")
+
 	// User management routes (admin only)
 	adminRouter := users.router.PathPrefix("/admin/users").Subrouter()
 	adminRouter.Use(middleware.Authenticate)
@@ -308,4 +313,25 @@ func (users *Users) updatePassword(w http.ResponseWriter, r *http.Request) {
 	util.Res.Writer(w).Status().Data(map[string]string{
 		"message": "Passowrd updated please ask user to re-login",
 	})
+}
+
+func (users *Users) searchUsers(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	
+	if query == "" {
+		util.Res.Writer(w).Status(400).Data("Search query is required")
+		return
+	}
+
+	// Search users by username or name
+	searchedUsers, err := users.userRepository.SearchUsers(query)
+	
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(js_array_method.Map(searchedUsers, func(user *repository.User, _ int) *dto.UserResponse {
+		return dto.NewUserResponse().Create(user)
+	}))
 }
