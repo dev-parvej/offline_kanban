@@ -129,7 +129,7 @@ func (tasks *Tasks) getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := tasks.taskRepository.FindByID(id)
+	task, err := tasks.taskRepository.FindByIDWithRelation(id)
 
 	if err != nil {
 		util.Res.Writer(w).Status(404).Data(err.Error())

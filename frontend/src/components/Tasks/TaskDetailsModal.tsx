@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   XMarkIcon, 
   PlusIcon, 
@@ -18,6 +18,7 @@ import { CleanHtml } from '../../utils/cleanHtml';
 import { Column } from '../../api/columnService';
 import { SearchSelect } from '../ui/Input';
 import { updateTaskStatus } from '../../api';
+import { getUserInitials } from '../../util/user';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
@@ -29,7 +30,8 @@ interface TaskDetailsModalProps {
       description?: string;
       priority?: 'low' | 'medium' | 'high' | 'urgent';
       databaseId: number,
-      column_id: number
+      column_id: number,
+      full: { [p: string]: any }
     };
     parentId: string;
   } | null;
@@ -86,6 +88,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
     },
   ];
 
+  const getUserName =  () => {
+    return task.content?.full?.assigned_user?.name || task.content?.full?.assigned_user?.root
+  }
+
   const getColumnName = (columnId: number) => {
     const column = columns?.find(col => col.id === columnId)
     return column?.title;
@@ -125,6 +131,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
     setStatusEditableMode(false)
     setSelectedColumn(undefined)
   }
+console.log(task);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8">
@@ -507,12 +514,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onCl
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                     isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
                   }`}>
-                    JD
+                    {task.content?.full?.assigned_to ? getUserInitials(getUserName()) : '' }
                   </div>
                   <span className={`text-sm ${
                     isDarkMode ? 'text-white' : 'text-gray-900'
                   }`}>
-                    John Doe
+                    { getUserName() ?? '' }
                   </span>
                 </div>
               </div>

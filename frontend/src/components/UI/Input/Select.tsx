@@ -12,6 +12,7 @@ interface SearchSelectProps {
   placeholder?: string;
   open?: boolean; // external control
   onOpenChange?: (isOpen: boolean) => void; // notify parent
+  onSearch?: (query: string) => Promise<Option[]>; // optional API search
 }
 
 export const SearchSelect = ({
@@ -21,9 +22,12 @@ export const SearchSelect = ({
   placeholder = "Select...",
   open: controlledOpen,
   onOpenChange,
+  onSearch,
 }: SearchSelectProps) => {
   const [query, setQuery] = useState("");
   const [internalOpen, setInternalOpen] = useState(false);
+  const [asyncOptions, setAsyncOptions] = useState<Option[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const isControlled = controlledOpen !== undefined;
@@ -47,9 +51,31 @@ export const SearchSelect = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filtered = options.filter((opt) =>
-    opt.label.toLowerCase().includes(query.toLowerCase())
-  );
+  // Handle API search if provided
+  useEffect(() => {
+    let active = true;
+
+    if (onSearch) {
+      setLoading(true);
+      onSearch(query)
+        .then((res) => {
+          if (active) setAsyncOptions(res);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setAsyncOptions(null); // fallback to local filter
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [query, onSearch]);
+
+  const filtered = asyncOptions
+    ? asyncOptions
+    : options.filter((opt) =>
+        opt.label.toLowerCase().includes(query.toLowerCase())
+      );
 
   return (
     <div ref={wrapperRef} className="relative w-64">
@@ -72,7 +98,9 @@ export const SearchSelect = ({
           />
 
           <ul className="max-h-48 overflow-y-auto">
-            {filtered.length > 0 ? (
+            {loading ? (
+              <li className="px-3 py-2 text-gray-500">Loading...</li>
+            ) : filtered.length > 0 ? (
               filtered.map((opt) => (
                 <li
                   key={opt.value}
@@ -94,4 +122,4 @@ export const SearchSelect = ({
       )}
     </div>
   );
-}
+};

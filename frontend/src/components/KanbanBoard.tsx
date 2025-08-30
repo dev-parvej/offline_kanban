@@ -117,7 +117,10 @@ export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoard
         assignee: task.assigned_user?.name || task.assigned_user?.user_name || '',
         dueDate: task.due_date || '',
         databaseId: task.id,
-        column_id: task.column_id
+        column_id: task.column_id,
+        full: {
+          ...task
+        }
       },
     };
   }

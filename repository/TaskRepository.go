@@ -90,6 +90,59 @@ func (tr *TaskRepository) FindByID(id int) (*Task, error) {
 	return task, nil
 }
 
+// Find task by ID
+func (tr *TaskRepository) FindByIDWithRelation(id int) (*Task, error) {
+	task := &Task{}
+	query := `
+		SELECT t.id, t.title, SUBSTR(t.description, 1, 400), t.column_id, t.assigned_to, t.created_by, 
+		       t.due_date, t.priority, t.position, t.weight, t.created_at, t.updated_at,
+		       au.username as assigned_username, au.name as assigned_name,
+		       cu.username as created_username, cu.name as created_name,
+		       c.title as column_title,
+		       COUNT(comm.id) as comment_count
+		FROM tasks t
+		LEFT JOIN users au ON t.assigned_to = au.id
+		LEFT JOIN users cu ON t.created_by = cu.id
+		LEFT JOIN columns c ON t.column_id = c.id
+		LEFT JOIN comments comm ON t.id = comm.task_id
+		WHERE t.id = ?`
+
+	var assignedUsername, assignedName, createdUsername, createdName, columnTitle sql.NullString
+
+	err := tr.db.Instance().QueryRow(query, id).Scan(&task.ID, &task.Title, &task.Description, &task.ColumnID,
+		&task.AssignedTo, &task.CreatedBy, &task.DueDate, &task.Priority,
+		&task.Position, &task.Weight, &task.CreatedAt, &task.UpdatedAt,
+		&assignedUsername, &assignedName, &createdUsername, &createdName,
+		&columnTitle, &task.CommentCount,
+	)
+
+	// Set related data
+	if assignedUsername.Valid {
+		task.AssignedUser = &User{
+			UserName: assignedUsername.String,
+			Name:     &assignedName.String,
+		}
+	}
+	if createdUsername.Valid {
+		task.CreatedByUser = &User{
+			UserName: createdUsername.String,
+			Name:     &createdName.String,
+		}
+	}
+	if columnTitle.Valid {
+		task.ColumnTitle = &columnTitle.String
+	}
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("task not found")
+		}
+		return nil, err
+	}
+
+	return task, nil
+}
+
 // Create new task
 func (tr *TaskRepository) Create(title string, description *string, columnID, createdBy int,
 	assignedTo *int, dueDate *time.Time, priority *string) (*Task, error) {
