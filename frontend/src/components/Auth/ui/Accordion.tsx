@@ -1,6 +1,6 @@
 'use client';
 import { ReactNode, useRef, useState, useEffect } from 'react';
-import { ChevronDown } from '../ui/Icons/ChevronDown';
+import { ChevronDown } from './Icons/ChevronDown';
 
 type AccordionItemProps = {
   title: string;
