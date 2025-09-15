@@ -94,7 +94,7 @@ func (tr *TaskRepository) FindByID(id int) (*Task, error) {
 func (tr *TaskRepository) FindByIDWithRelation(id int) (*Task, error) {
 	task := &Task{}
 	query := `
-		SELECT t.id, t.title, SUBSTR(t.description, 1, 400), t.column_id, t.assigned_to, t.created_by, 
+		SELECT t.id, t.title, t.description, t.column_id, t.assigned_to, t.created_by, 
 		       t.due_date, t.priority, t.position, t.weight, t.created_at, t.updated_at,
 		       au.username as assigned_username, au.name as assigned_name,
 		       cu.username as created_username, cu.name as created_name,
