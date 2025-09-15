@@ -22,6 +22,9 @@ func SetUpGorilaMuxServer(db *database.Database) http.Handler {
 	controller.UserController(router, db).Router()
 	controller.TaskController(router, db).Router()
 	controller.SettingsController(router, db).Router()
+	controller.FileController(router, db).Router()
+	controller.CommentController(router, db).Router()
+	controller.ActivityController(router, db).Router()
 
 	// Example root API route
 	if isDev() {

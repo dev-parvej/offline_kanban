@@ -6,6 +6,31 @@
     background-color: unset !important;
 }
 
-.rkk-column-header {
-    background-color: unset !important;
-} */
+**/
+
+.rkk-board {
+   padding-bottom: 20px;
+}
+
+/* Custom scrollbar only inside .scroll-box */
+@layer utilities {
+  /* Light mode */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8x;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded-full;
+  }
+
+  /* Dark mode */
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600;
+  }
+}

@@ -1,79 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Kanban } from 'react-kanban-kit';
 import { useTheme } from '../contexts/ThemeContext';
 import { TaskDetailsModal } from './Tasks/TaskDetailsModal';
+import { getTask, getTasks, moveTask, TaskResponse } from '../api/taskService';
+import { getColumns, Column } from '../api/columnService';
+import { sliceString } from '../utils/util';
+import { CleanHtml } from '../utils/cleanHtml';
 
-export const KanbanBoard: React.FC = () => {
+interface KanbanNode {
+  id: string;
+  title: string;
+  children: string[];
+  totalChildrenCount: number;
+  parentId: string | null;
+  type?: 'card';
+  content?: {
+    description?: string;
+    priority?: string;
+    assignee?: string;
+    dueDate?: string;
+    databaseId?: number;
+    column_id?: number
+  };
+}
+
+interface KanbanDataSource {
+  [key: string]: KanbanNode;
+}
+
+interface KanbanBoardProps {
+  onTaskCreated?: () => void;
+}
+
+export const KanbanBoard = React.forwardRef<{ refresh: () => void }, KanbanBoardProps>(({ onTaskCreated }, ref) => {
   const { isDarkMode } = useTheme();
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [selectedTask, setSelectedTask] = useState<KanbanNode | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [columns, setColumns] = useState<Column[]>({} as Column[])
   
-  const [dataSource, setDataSource] = useState({
-    root: {
-      id: "root",
-      title: "Root",
-      children: ["col-1", "col-2", "col-3"],
-      totalChildrenCount: 3,
-      parentId: null,
-    },
-    "col-1": {
-      id: "col-1",
-      title: "To Do",
-      children: ["task-1", "task-2"],
-      totalChildrenCount: 2,
-      parentId: "root",
-    },
-    "col-2": {
-      id: "col-2",
-      title: "In Progress",
-      children: ["task-3"],
-      totalChildrenCount: 1,
-      parentId: "root",
-    },
-    "col-3": {
-      id: "col-3",
-      title: "Done",
-      children: ["task-4"],
-      totalChildrenCount: 1,
-      parentId: "root",
-    },
-    "task-1": {
-      id: "task-1",
-      title: "Design Homepage",
-      parentId: "col-1",
+  const [dataSource, setDataSource] = useState<KanbanDataSource>({});
+
+  // Fetch data from backend
+  const fetchKanbanData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [columnsResponse, tasksResponse] = await Promise.all([
+          getColumns(),
+          getTasks({ order_by: 'position', order_dir: 'asc', page_size: 1000 })
+        ]);
+
+        setColumns(columnsResponse.columns)
+
+        const columnsEntities = columnsResponse.columns;
+        const tasks = tasksResponse.tasks;
+
+        // Build kanban data structure
+        const newDataSource: KanbanDataSource = {
+          root: {
+            id: "root",
+            title: "Root",
+            children: columnsEntities.map(col => `col-${col.id}`),
+            totalChildrenCount: columnsEntities.length,
+            parentId: null,
+          }
+        };
+
+        // Add columns
+        columnsEntities.forEach(column => {
+          const columnTasks = tasks
+            .filter(task => task.column_id === column.id)
+            .sort((a, b) => a.position - b.position);
+
+          newDataSource[`col-${column.id}`] = {
+            id: `col-${column.id}`,
+            title: column.title,
+            children: columnTasks.map(task => `task-${task.id}`),
+            totalChildrenCount: columnTasks.length,
+            parentId: "root",
+          };
+        });
+
+        // Add tasks
+        tasks.forEach(task => {
+          newDataSource[`task-${task.id}`] = buildKanbanCard(task) as any
+        });
+
+        setDataSource(newDataSource);
+      } catch (err) {
+        console.error('Error fetching kanban data:', err);
+        setError('Failed to load kanban data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  // Expose refresh method via ref
+  React.useImperativeHandle(ref, () => ({
+    refresh: fetchKanbanData
+  }));
+
+  const buildKanbanCard = (task: TaskResponse) => {
+    return {
+      id: `task-${task.id}`,
+      title: task.title,
+      parentId: `col-${task.column_id}`,
       children: [],
       totalChildrenCount: 0,
       type: "card",
       content: {
-        description: "Create wireframes and mockups for the homepage",
-        priority: "high",
+        description: task.description || '',
+        priority: task.priority || '',
+        assignee: task.assigned_user?.name || task.assigned_user?.user_name || '',
+        dueDate: task.due_date || '',
+        databaseId: task.id,
+        column_id: task.column_id,
+        full: {
+          ...task
+        }
       },
-    },
-    "task-2": {
-      id: "task-2",
-      title: "Setup Database",
-      parentId: "col-1",
-      children: [],
-      totalChildrenCount: 0,
-      type: "card",
-    },
-    "task-3": {
-      id: "task-3",
-      title: "Develop API",
-      parentId: "col-2",
-      children: [],
-      totalChildrenCount: 0,
-      type: "card",
-    },
-    "task-4": {
-      id: "task-4",
-      title: "Deploy App",
-      parentId: "col-3",
-      children: [],
-      totalChildrenCount: 0,
-      type: "card",
-    },
-  });
+    };
+  }
+
+  useEffect(() => {
+    fetchKanbanData();
+  }, []);
 
   const configMap = {
     card: {
@@ -82,7 +136,7 @@ export const KanbanBoard: React.FC = () => {
           <h3 className="font-semibold mb-2">{data.title}</h3>
           {data.content?.description && (
             <p className="text-sm mb-3 text-gray-600 dark:text-gray-300">
-              {data.content.description}
+              <CleanHtml html={sliceString(data.content.description)} />
             </p>
           )}
           <div className="card-meta">
@@ -115,32 +169,94 @@ export const KanbanBoard: React.FC = () => {
     color: isDarkMode ? '#ffffff' : '#000000',
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div style={kanbanStyles} className='pt-6 flex justify-center items-center h-64'>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-gray-600 dark:text-gray-300">Loading kanban board...</span>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div style={kanbanStyles} className='pt-6 flex justify-center items-center h-64'>
+        <div className="text-center">
+          <div className="text-red-500 dark:text-red-400 mb-2">⚠️ Error</div>
+          <div className="text-gray-600 dark:text-gray-300">{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={kanbanStyles} className='pt-6'>
       <Kanban
-        dataSource={dataSource}
+        dataSource={dataSource as any}
         configMap={configMap}
         columnWrapperStyle={() => columnStyle}
-        onCardClick={(_, card) => {
-          setSelectedTask(card);
-          setIsTaskDetailsOpen(true);
+        onCardClick={async (_, card) => {
+          if(card.content?.databaseId) {
+            const {task} = await getTask(card.content.databaseId);
+            setSelectedTask(buildKanbanCard(task as any) as any);
+            setIsTaskDetailsOpen(true);
+          }
         }}
-        onCardMove={(move) => {
-          if (Object.hasOwn(dataSource, move.toColumnId)) {
-            const source = {...dataSource}
+        onCardMove={async (move) => {
+          try {
+            // Extract task ID and column ID from the move data
+            const taskId = parseInt(move.cardId.replace('task-', ''));
+            const newColumnId = parseInt(move.toColumnId.replace('col-', ''));
+            console.log(taskId, newColumnId);
+            
+            // Calculate new position based on target index
+            const targetColumn = dataSource[move.toColumnId];
+            const newPosition = move.position || targetColumn.children.length;
+            
+            // Call backend API to move the task
+            await moveTask(taskId, {
+              column_id: newColumnId,
+              new_position: Number(newPosition)
+            });
 
-            const targetColumn = (source as any)[move.toColumnId];
-            if (!targetColumn.children.find((id: string) => id === move.cardId)) {
-              targetColumn.children.push(move.cardId);
-              targetColumn.totalChildrenCount = targetColumn.children.length;
+            // Update local state optimistically
+            if (Object.hasOwn(dataSource, move.toColumnId)) {
+              const source = {...dataSource};
+
+              const targetColumn = source[move.toColumnId];
+              if (!targetColumn.children.find((id: string) => id === move.cardId)) {
+                targetColumn.children.push(move.cardId);
+                targetColumn.totalChildrenCount = targetColumn.children.length;
+              }
+
+              const sourceColumn = source[move.fromColumnId];
+              if (move.toColumnId !== move.fromColumnId) {
+                sourceColumn.children = sourceColumn.children.filter(
+                  (id: string) => id !== move.cardId
+                );  
+              }
+              sourceColumn.totalChildrenCount = sourceColumn.children.length;
+
+              // Update the task's parentId
+              const task = source[move.cardId];
+              if (task) {
+                task.parentId = move.toColumnId;
+              }
+
+              setDataSource({...source});
             }
-
-            const sourceColumn = (source as any)[move.fromColumnId];
-            sourceColumn.children = sourceColumn.children.filter(
-              (id: string) => id !== move.cardId
-            );
-            sourceColumn.totalChildrenCount = sourceColumn.children.length;
-            setDataSource({...source});
+          } catch (error) {
+            console.error('Error moving task:', error);
+            // Optionally show error message to user
+            // You could add a toast notification here
           }
         }}
         onColumnMove={(move) => {
@@ -155,8 +271,10 @@ export const KanbanBoard: React.FC = () => {
           setIsTaskDetailsOpen(false);
           setSelectedTask(null);
         }}
-        task={selectedTask}
+        task={selectedTask as any}
+        columns={columns}
+        column={columns.find(col => col.id === selectedTask?.content?.column_id)}
       />
     </div>
   );
-};
+});

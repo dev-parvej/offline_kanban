@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { Modal } from '../components/ui/Modal';
@@ -6,11 +6,15 @@ import { CreateTaskForm } from '../components/Tasks/CreateTaskForm';
 
 export const Dashboard: React.FC = () => {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const kanbanRef = useRef<{ refresh: () => void }>(null);
 
   const handleCreateTask = async (taskData: any) => {
-    // TODO: Implement task creation logic
-    console.log('Creating task:', taskData);
-    // This will be connected to the backend later
+    console.log('Task created:', taskData);
+    // Refresh the kanban board to show the new task
+    if (kanbanRef.current) {
+      kanbanRef.current.refresh();
+    }
+    setShowCreateTaskModal(false);
   };
 
   return (
@@ -38,7 +42,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Kanban Board */}
-        <KanbanBoard />
+        <KanbanBoard ref={kanbanRef} />
       </div>
 
       {/* Create Task Modal */}

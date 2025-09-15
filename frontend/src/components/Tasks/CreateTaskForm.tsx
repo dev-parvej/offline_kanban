@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, FieldValues, Controller } from 'react-hook-form';
 import FormGroup from '../ui/FormGroup';
 import { Input } from '../ui/Input';
@@ -7,10 +7,13 @@ import { useToast } from '../../hook';
 import RichTextEditor from '../ui/RichTextEditor';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TaskChecklist } from './TaskChecklist';
+import { createTask, CreateTaskRequest } from '../../api/taskService';
+import { getColumns, Column } from '../../api/columnService';
+import { getAllUsers, UserResponse } from '../../api/userService';
 
 interface CreateTaskFormProps {
   onClose: () => void;
-  onSubmit: (taskData: any) => void;
+  onSubmit?: (taskData: any) => void; // Make optional since we'll handle API call internally
 }
 
 interface ChecklistItem {
@@ -26,15 +29,12 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [columns, setColumns] = useState<Column[]>([]);
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
   const { showToast, ToastContainer } = useToast();
   const { register, handleSubmit, control, formState: { errors } } = useForm();
   const { isDarkMode } = useTheme();
-
-  const columns = [
-    { id: 'col-1', name: 'To Do' },
-    { id: 'col-2', name: 'In Progress' },
-    { id: 'col-3', name: 'Done' }
-  ];
 
   const priorities = [
     { value: 'low', label: 'Low' },
@@ -43,13 +43,27 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
     { value: 'urgent', label: 'Urgent' }
   ];
 
-  // Mock users - will be replaced with API call
-  const users = [
-    { id: '1', name: 'John Smith', email: 'john@example.com' },
-    { id: '2', name: 'Sarah Johnson', email: 'sarah@example.com' },
-    { id: '3', name: 'Michael Brown', email: 'michael@example.com' },
-    { id: '4', name: 'Emily Davis', email: 'emily@example.com' }
-  ];
+  // Fetch columns and users on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoadingData(true);
+        const [columnsResponse, usersResponse] = await Promise.all([
+          getColumns(),
+          getAllUsers()
+        ]);
+        setColumns(columnsResponse.columns);
+        setUsers(usersResponse);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to load form data. Please try again.', 'error');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const getUserInitials = (name: string) => {
     return name
@@ -62,18 +76,32 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
   const saveTask = async (data: FieldValues) => {
     setIsLoading(true);
     try {
-      // Transform the form data
-      const taskData = {
+      // Convert due date to ISO format if provided
+      let dueDate: string | undefined;
+      if (data.due_date) {
+        // Convert datetime-local to ISO format
+        const date = new Date(data.due_date);
+        dueDate = date.toISOString();
+      }
+
+      // Transform the form data to match backend DTO
+      const taskData: CreateTaskRequest = {
         title: data.title,
-        content: data.content || '',
-        priority: data.priority,
-        columnId: data.columnId,
-        assignee: data.assignee || null,
-        checklist: checklistItems,
-        autoArchiveDays: data.autoArchiveDays ? parseInt(data.autoArchiveDays) : undefined
+        description: data.content || undefined,
+        column_id: parseInt(data.column_id),
+        assigned_to: data.assigned_to ? parseInt(data.assigned_to) : undefined,
+        priority: data.priority || undefined,
+        due_date: dueDate
       };
       
-      await onSubmit(taskData);
+      // Call backend API
+      const response = await createTask(taskData);
+      
+      // Call parent onSubmit if provided (for updating UI state)
+      if (onSubmit) {
+        await onSubmit(response.task);
+      }
+      
       showToast("Task created successfully!", "success");
       
       // Reset form and checklist
@@ -86,6 +114,18 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Show loading state while fetching data
+  if (loadingData) {
+    return (
+      <div className="text-gray-900 dark:text-white">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2">Loading form data...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-gray-900 dark:text-white">
@@ -128,7 +168,7 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
             defaultValue=""
             rules={{
               maxLength: {
-                value: 1000,
+                value: 10000,
                 message: "Description must not exceed 1000 characters"
               }
             }}
@@ -152,13 +192,13 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
         <FormGroup label="Assignee">
           <select
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            {...register("assignee")}
+            {...register("assigned_to")}
             defaultValue=""
           >
             <option value="">Unassigned</option>
             {users.map(user => (
               <option key={user.id} value={user.id}>
-                {user.name} ({user.email})
+                {user.name ? `${user.name} (${user.user_name})` : user.user_name}
               </option>
             ))}
           </select>
@@ -191,51 +231,31 @@ export const CreateTaskForm: React.FC<CreateTaskFormProps> = ({
           </FormGroup>
 
           {/* Column Field */}
-          <FormGroup label="Column" errorMessage={errors.columnId?.message as string}>
+          <FormGroup label="Column" errorMessage={errors.column_id?.message as string}>
             <select
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              {...register("columnId", { required: "Please select a column" })}
-              defaultValue="col-1"
+              {...register("column_id", { required: "Please select a column" })}
+              defaultValue={columns.length > 0 ? columns[0].id.toString() : ""}
             >
               {columns.map(column => (
                 <option key={column.id} value={column.id}>
-                  {column.name}
+                  {column.title}
                 </option>
               ))}
             </select>
           </FormGroup>
         </div>
 
-        {/* Auto-archive Field */}
-        <FormGroup label="Auto-archive after (days)" errorMessage={errors.autoArchiveDays?.message as string}>
+        {/* Due Date Field */}
+        <FormGroup label="Due Date" errorMessage={errors.due_date?.message as string}>
           <Input
-            type="number"
-            placeholder="Leave empty to never auto-archive"
-            min="1"
-            {...register("autoArchiveDays", {
-              min: {
-                value: 1,
-                message: "Auto-archive days must be at least 1"
-              },
-              max: {
-                value: 365,
-                message: "Auto-archive days must not exceed 365"
-              }
-            })}
+            type="datetime-local"
+            placeholder="Select due date and time"
+            {...register("due_date")}
           />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Task will be automatically archived after the specified number of days. Leave empty for permanent tasks.
+            Optional due date and time for the task.
           </p>
-        </FormGroup>
-
-        {/* Checklist Field */}
-        <FormGroup label="Task Checklist">
-          <TaskChecklist
-            items={checklistItems}
-            onChange={setChecklistItems}
-            editable={true}
-            showProgress={false}
-          />
         </FormGroup>
 
         {/* Action Buttons */}

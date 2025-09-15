@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,30 +12,35 @@ import (
 	"github.com/dev-parvej/offline_kanban/pkg/dto"
 	"github.com/dev-parvej/offline_kanban/pkg/util"
 	"github.com/dev-parvej/offline_kanban/repository"
+	"github.com/dev-parvej/offline_kanban/service"
 	"github.com/gorilla/mux"
 )
 
 type Tasks struct {
-	router           *mux.Router
-	taskRepository   *repository.TaskRepository
-	userRepository   *repository.UserRepository
-	columnRepository *repository.ColumnRepository
-	db               *database.Database
+	router              *mux.Router
+	taskRepository      *repository.TaskRepository
+	userRepository      *repository.UserRepository
+	columnRepository    *repository.ColumnRepository
+	checklistRepository *repository.ChecklistRepository
+	taskService         *service.TaskService
+	db                  *database.Database
 }
 
 func TaskController(router *mux.Router, db *database.Database) *Tasks {
 	return &Tasks{
-		router:           router,
-		taskRepository:   repository.NewTaskRepository(db),
-		userRepository:   repository.NewUserRepository(db),
-		columnRepository: repository.NewColumnRepository(db),
-		db:               db,
+		router:              router,
+		taskRepository:      repository.NewTaskRepository(db),
+		userRepository:      repository.NewUserRepository(db),
+		columnRepository:    repository.NewColumnRepository(db),
+		checklistRepository: repository.NewChecklistRepository(db),
+		taskService:         service.NewTaskService(db),
+		db:                  db,
 	}
 }
 
 func (tasks *Tasks) Router() {
 	// All task routes require authentication
-	taskRouter := tasks.router.PathPrefix("/tasks").Subrouter()
+	taskRouter := tasks.router.PathPrefix("/features/tasks").Subrouter()
 	taskRouter.Use(middleware.Authenticate)
 
 	// Public task operations (all authenticated users)
@@ -43,6 +49,14 @@ func (tasks *Tasks) Router() {
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.getTask).Methods("GET")
 	taskRouter.HandleFunc("/{id:[0-9]+}", tasks.updateTask).Methods("PUT")
 	taskRouter.HandleFunc("/{id:[0-9]+}/move", tasks.moveTask).Methods("POST")
+	taskRouter.HandleFunc("/{id:[0-9]+}/update-column", tasks.updateColumnId).Methods("POST")
+
+	// Checklist operations (all authenticated users)
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists", tasks.getTaskChecklists).Methods("GET")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists", tasks.createChecklist).Methods("POST")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}", tasks.updateChecklist).Methods("PUT")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}/toggle", tasks.toggleChecklist).Methods("POST")
+	taskRouter.HandleFunc("/{taskId:[0-9]+}/checklists/{id:[0-9]+}", tasks.deleteChecklist).Methods("DELETE")
 
 	// Admin-only task operations (root users only)
 	adminTaskRouter := tasks.router.PathPrefix("/admin/tasks").Subrouter()
@@ -56,7 +70,7 @@ func (tasks *Tasks) Router() {
 func (tasks *Tasks) getAllTasks(w http.ResponseWriter, r *http.Request) {
 	// Parse and validate query parameters
 	filter := tasks.parseTaskFilter(r)
-	
+
 	// Validate the filter struct
 	if err := util.ValidateStruct(filter); err != nil {
 		util.Res.Writer(w).Status(400).Data(err.Error())
@@ -118,7 +132,7 @@ func (tasks *Tasks) getTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := tasks.taskRepository.FindByID(id)
+	task, err := tasks.taskRepository.FindByIDWithRelation(id)
 
 	if err != nil {
 		util.Res.Writer(w).Status(404).Data(err.Error())
@@ -174,15 +188,15 @@ func (tasks *Tasks) createTask(w http.ResponseWriter, r *http.Request) {
 		dueDate = &parsedDate
 	}
 
-	// Create task
-	task, err := tasks.taskRepository.Create(
+	// Create task using service (handles activity tracking)
+	task, err := tasks.taskService.CreateTask(
 		createTaskDto.Title,
-		createTaskDto.Description,
+		*createTaskDto.Description,
 		createTaskDto.ColumnID,
 		userIdInt,
 		createTaskDto.AssignedTo,
 		dueDate,
-		createTaskDto.Priority,
+		*createTaskDto.Priority,
 	)
 
 	if err != nil {
@@ -259,14 +273,16 @@ func (tasks *Tasks) updateTask(w http.ResponseWriter, r *http.Request) {
 		dueDate = &parsedDate
 	}
 
-	// Update task
-	task, err := tasks.taskRepository.Update(
+	// Update task using service (handles activity tracking)
+	task, err := tasks.taskService.UpdateTask(
 		id,
+		userIdInt,
 		updateTaskDto.Title,
 		updateTaskDto.Description,
 		updateTaskDto.AssignedTo,
 		dueDate,
 		updateTaskDto.Priority,
+		updateTaskDto.ColumnID,
 	)
 
 	if err != nil {
@@ -290,7 +306,7 @@ func (tasks *Tasks) moveTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	moveTaskDto, errors := util.ValidateRequest(r, dto.MoveTaskDto{})
-
+	fmt.Println(moveTaskDto.NewPosition)
 	if errors != nil {
 		util.Res.Writer(w).Status422().Data(errors.Error())
 		return
@@ -374,7 +390,7 @@ func (tasks *Tasks) forceUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Admin can force update any task (no ownership check)
-	
+
 	// Validate assigned user exists (if being updated)
 	if updateTaskDto.AssignedTo != nil {
 		_, err = tasks.userRepository.FindByID(*updateTaskDto.AssignedTo)
@@ -416,82 +432,117 @@ func (tasks *Tasks) forceUpdateTask(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (tasks *Tasks) updateColumnId(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	updateTaskDto, errors := util.ValidateRequest(r, dto.UpdateTaskColumnDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	col, _ := tasks.columnRepository.GetTaskCount(*updateTaskDto.ColumnID)
+
+	// Update task
+	err = tasks.taskRepository.MoveToColumn(
+		id,
+		*updateTaskDto.ColumnID,
+		col,
+	)
+
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"task": "Task moved successfully",
+	})
+}
+
 // Helper methods
 func (tasks *Tasks) parseTaskFilter(r *http.Request) dto.TaskFilterDto {
 	query := r.URL.Query()
-	
+
 	filter := dto.TaskFilterDto{}
-	
+
 	if search := strings.TrimSpace(query.Get("search")); search != "" {
 		filter.Search = &search
 	}
-	
+
 	if columnID, err := strconv.Atoi(query.Get("column_id")); err == nil && columnID > 0 {
 		filter.ColumnID = &columnID
 	}
-	
+
 	if assignedTo, err := strconv.Atoi(query.Get("assigned_to")); err == nil && assignedTo > 0 {
 		filter.AssignedTo = &assignedTo
 	}
-	
+
 	if createdBy, err := strconv.Atoi(query.Get("created_by")); err == nil && createdBy > 0 {
 		filter.CreatedBy = &createdBy
 	}
-	
+
 	if priority := query.Get("priority"); priority != "" {
 		filter.Priority = &priority
 	}
-	
+
 	if dueDateFrom := query.Get("due_date_from"); dueDateFrom != "" {
 		filter.DueDateFrom = &dueDateFrom
 	}
-	
+
 	if dueDateTo := query.Get("due_date_to"); dueDateTo != "" {
 		filter.DueDateTo = &dueDateTo
 	}
-	
+
 	if createdFrom := query.Get("created_from"); createdFrom != "" {
 		filter.CreatedFrom = &createdFrom
 	}
-	
+
 	if createdTo := query.Get("created_to"); createdTo != "" {
 		filter.CreatedTo = &createdTo
 	}
-	
+
 	if page, err := strconv.Atoi(query.Get("page")); err == nil && page > 0 {
 		filter.Page = &page
 	} else {
 		defaultPage := 1
 		filter.Page = &defaultPage
 	}
-	
-	if pageSize, err := strconv.Atoi(query.Get("page_size")); err == nil && pageSize > 0 && pageSize <= 100 {
+
+	if pageSize, err := strconv.Atoi(query.Get("page_size")); err == nil && pageSize > 0 {
 		filter.PageSize = &pageSize
 	} else {
 		defaultPageSize := 20
 		filter.PageSize = &defaultPageSize
 	}
-	
+
 	if orderBy := query.Get("order_by"); orderBy != "" {
 		filter.OrderBy = &orderBy
 	}
-	
+
 	if orderDir := query.Get("order_dir"); orderDir != "" {
 		filter.OrderDir = &orderDir
 	}
-	
+
 	return filter
 }
 
 func (tasks *Tasks) convertToRepoFilters(filter dto.TaskFilterDto) repository.TaskFilters {
 	repoFilter := repository.TaskFilters{
-		Search:    filter.Search,
-		ColumnID:  filter.ColumnID,
+		Search:     filter.Search,
+		ColumnID:   filter.ColumnID,
 		AssignedTo: filter.AssignedTo,
-		CreatedBy: filter.CreatedBy,
-		Priority:  filter.Priority,
+		CreatedBy:  filter.CreatedBy,
+		Priority:   filter.Priority,
 	}
-	
+
 	// Parse date strings to time.Time
 	if filter.DueDateFrom != nil {
 		if parsed, err := time.Parse(time.RFC3339, *filter.DueDateFrom); err == nil {
@@ -513,7 +564,7 @@ func (tasks *Tasks) convertToRepoFilters(filter dto.TaskFilterDto) repository.Ta
 			repoFilter.CreatedTo = &parsed
 		}
 	}
-	
+
 	// Set pagination
 	if filter.Page != nil && filter.PageSize != nil {
 		limit := *filter.PageSize
@@ -521,45 +572,45 @@ func (tasks *Tasks) convertToRepoFilters(filter dto.TaskFilterDto) repository.Ta
 		repoFilter.Limit = &limit
 		repoFilter.Offset = &offset
 	}
-	
+
 	// Set ordering
 	if filter.OrderBy != nil {
 		repoFilter.OrderBy = *filter.OrderBy
 	} else {
 		repoFilter.OrderBy = "position"
 	}
-	
+
 	if filter.OrderDir != nil {
 		repoFilter.OrderDir = *filter.OrderDir
 	} else {
 		repoFilter.OrderDir = "asc"
 	}
-	
+
 	return repoFilter
 }
 
 func (tasks *Tasks) convertToResponseDto(task *repository.Task) dto.TaskResponseDto {
 	response := dto.TaskResponseDto{
-		ID:          task.ID,
-		Title:       task.Title,
-		Description: task.Description,
-		ColumnID:    task.ColumnID,
-		AssignedTo:  task.AssignedTo,
-		CreatedBy:   task.CreatedBy,
-		Priority:    task.Priority,
-		Position:    task.Position,
-		Weight:      task.Weight,
-		CreatedAt:   task.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   task.UpdatedAt.Format(time.RFC3339),
+		ID:           task.ID,
+		Title:        task.Title,
+		Description:  task.Description,
+		ColumnID:     task.ColumnID,
+		AssignedTo:   task.AssignedTo,
+		CreatedBy:    task.CreatedBy,
+		Priority:     task.Priority,
+		Position:     task.Position,
+		Weight:       task.Weight,
+		CreatedAt:    task.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    task.UpdatedAt.Format(time.RFC3339),
 		CommentCount: task.CommentCount,
 	}
-	
+
 	// Handle due date
 	if task.DueDate != nil {
 		dueDateStr := task.DueDate.Format(time.RFC3339)
 		response.DueDate = &dueDateStr
 	}
-	
+
 	// Handle related data
 	if task.AssignedUser != nil {
 		name := ""
@@ -572,7 +623,7 @@ func (tasks *Tasks) convertToResponseDto(task *repository.Task) dto.TaskResponse
 			Name:     name,
 		}
 	}
-	
+
 	if task.CreatedByUser != nil {
 		name := ""
 		if task.CreatedByUser.Name != nil {
@@ -584,10 +635,320 @@ func (tasks *Tasks) convertToResponseDto(task *repository.Task) dto.TaskResponse
 			Name:     name,
 		}
 	}
-	
+
 	if task.ColumnTitle != nil {
 		response.ColumnTitle = task.ColumnTitle
 	}
-	
+
+	return response
+}
+
+// Checklist handlers
+func (tasks *Tasks) getTaskChecklists(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	// Check if task exists
+	_, err = tasks.taskRepository.FindByID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Task not found")
+		return
+	}
+
+	// Get checklists for the task
+	checklists, err := tasks.checklistRepository.FindByTaskID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	// Convert to response DTOs
+	checklistResponses := make([]dto.ChecklistResponseDto, len(checklists))
+	completedCount := 0
+	for i, checklist := range checklists {
+		checklistResponses[i] = tasks.convertChecklistToResponseDto(checklist)
+		if checklist.IsCompleted {
+			completedCount++
+		}
+	}
+
+	response := dto.ChecklistListResponseDto{
+		Checklists: checklistResponses,
+		TaskID:     taskID,
+		Total:      len(checklists),
+		Completed:  completedCount,
+	}
+
+	util.Res.Writer(w).Status().Data(response)
+}
+
+func (tasks *Tasks) createChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	createChecklistDto, errors := util.ValidateRequest(r, dto.CreateChecklistDto{})
+
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check if task exists
+	_, err = tasks.taskRepository.FindByID(taskID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Task not found")
+		return
+	}
+
+	// Validate that the taskID in the DTO matches the URL parameter
+	if createChecklistDto.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Task ID mismatch")
+		return
+	}
+
+	// Create checklist
+	checklist, err := tasks.checklistRepository.Create(createChecklistDto.Title, taskID, userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) updateChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	updateChecklistDto, errors := util.ValidateRequest(r, dto.UpdateChecklistDto{})
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check permissions: users can only edit their own checklists (unless they're root)
+	currentUser, err := tasks.userRepository.FindByID(userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data("Failed to get user info")
+		return
+	}
+
+	if !currentUser.IsRoot && existingChecklist.CreatedBy != userIdInt {
+		util.Res.Writer(w).Status(403).Data("You can only edit your own checklists")
+		return
+	}
+
+	// Update checklist
+	checklist, err := tasks.checklistRepository.Update(checklistID, updateChecklistDto.Title)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) toggleChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	toggleChecklistDto, errors := util.ValidateRequest(r, dto.ToggleChecklistDto{})
+	if errors != nil {
+		util.Res.Writer(w).Status422().Data(errors.Error())
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Toggle checklist completion
+	checklist, err := tasks.checklistRepository.ToggleComplete(checklistID, userIdInt, toggleChecklistDto.Completed)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	response := tasks.convertChecklistToResponseDto(checklist)
+	util.Res.Writer(w).Status().Data(map[string]dto.ChecklistResponseDto{
+		"checklist": response,
+	})
+}
+
+func (tasks *Tasks) deleteChecklist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["taskId"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid task ID")
+		return
+	}
+
+	checklistID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid checklist ID")
+		return
+	}
+
+	// Check if checklist exists and belongs to the task
+	existingChecklist, err := tasks.checklistRepository.FindByID(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(404).Data("Checklist not found")
+		return
+	}
+
+	if existingChecklist.TaskID != taskID {
+		util.Res.Writer(w).Status(400).Data("Checklist does not belong to this task")
+		return
+	}
+
+	// Get current user ID
+	userId := r.Header.Get("user_id")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		util.Res.Writer(w).Status(400).Data("Invalid user ID")
+		return
+	}
+
+	// Check permissions: users can only delete their own checklists (unless they're root)
+	currentUser, err := tasks.userRepository.FindByID(userIdInt)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data("Failed to get user info")
+		return
+	}
+
+	if !currentUser.IsRoot && existingChecklist.CreatedBy != userIdInt {
+		util.Res.Writer(w).Status(403).Data("You can only delete your own checklists")
+		return
+	}
+
+	err = tasks.checklistRepository.Delete(checklistID)
+	if err != nil {
+		util.Res.Writer(w).Status(500).Data(err.Error())
+		return
+	}
+
+	util.Res.Writer(w).Status().Data(map[string]string{
+		"message": "Checklist deleted successfully",
+	})
+}
+
+// Helper method to convert checklist to response DTO
+func (tasks *Tasks) convertChecklistToResponseDto(checklist *repository.Checklist) dto.ChecklistResponseDto {
+	response := dto.ChecklistResponseDto{
+		ID:          checklist.ID,
+		Title:       checklist.Title,
+		TaskID:      checklist.TaskID,
+		CreatedBy:   checklist.CreatedBy,
+		CompletedBy: checklist.CompletedBy,
+		IsCompleted: checklist.IsCompleted,
+		CreatedAt:   checklist.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   checklist.UpdatedAt.Format(time.RFC3339),
+	}
+
+	// Handle related user data
+	if checklist.CreatedByUser != nil {
+		name := ""
+		if checklist.CreatedByUser.Name != nil {
+			name = *checklist.CreatedByUser.Name
+		}
+		response.CreatedByUser = &dto.UserDto{
+			ID:       checklist.CreatedByUser.ID,
+			UserName: checklist.CreatedByUser.UserName,
+			Name:     name,
+		}
+	}
+
+	if checklist.CompletedByUser != nil {
+		name := ""
+		if checklist.CompletedByUser.Name != nil {
+			name = *checklist.CompletedByUser.Name
+		}
+		response.CompletedByUser = &dto.UserDto{
+			ID:       checklist.CompletedByUser.ID,
+			UserName: checklist.CompletedByUser.UserName,
+			Name:     name,
+		}
+	}
+
 	return response
 }

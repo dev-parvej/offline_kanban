@@ -276,3 +276,48 @@ func (ur *UserRepository) UsernameExists(username string) (bool, error) {
 
 	return count > 0, nil
 }
+
+// Search users by username or name (returns limited fields)
+func (ur *UserRepository) SearchUsers(searchQuery string) ([]*User, error) {
+	query := `
+		SELECT id, username, name
+		FROM users 
+		WHERE is_active = 1 
+		AND (username LIKE ? OR name LIKE ?)
+		ORDER BY 
+			CASE 
+				WHEN username = ? THEN 1
+				WHEN name = ? THEN 2
+				WHEN username LIKE ? THEN 3
+				WHEN name LIKE ? THEN 4
+				ELSE 5
+			END,
+			username ASC
+		LIMIT 20`
+
+	searchPattern := "%" + searchQuery + "%"
+	rows, err := ur.db.Instance().Query(query, 
+		searchPattern, searchPattern, 
+		searchQuery, searchQuery,
+		searchQuery+"%", searchQuery+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		user := &User{}
+		err := rows.Scan(
+			&user.ID,
+			&user.UserName,
+			&user.Name,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}

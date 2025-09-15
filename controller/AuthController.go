@@ -143,6 +143,12 @@ func (auth *Auth) refreshToken(w http.ResponseWriter, r *http.Request) {
 
 	go auth.refreshTokenRepository.RevokeToken(refreshDto.RefreshToken)
 
+	auth.refreshTokenRepository.Create(
+		userToken.UserID,
+		newRefreshToken,
+		time.Now().Add(time.Duration(util.ParseInt(config.Get("REFRESH_TOKEN_EXPIRATION")))*(time.Hour*24)),
+	)
+
 	util.Res.Writer(w).Status().Data(dto.NewRefreshTokenResponse().Create(map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": newRefreshToken,

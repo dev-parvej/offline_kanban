@@ -10,28 +10,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
 
-interface Task {
-  id: string;
-  title: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'active' | 'archived';
-  columnId: string;
-  columnName: string;
-  assignee?: string;
-  assigneeName?: string;
-  createdAt: string;
-  updatedAt: string;
-  dueDate?: string;
-  autoArchiveDays?: number;
-}
 
 interface TaskSearchResultsProps {
-  tasks: Task[];
+  tasks: any[];
   loading: boolean;
-  onViewTask: (task: Task) => void;
-  onEditTask: (task: Task) => void;
-  onArchiveTask: (task: Task) => void;
+  onViewTask: (task: any) => void;
+  onEditTask: (task: any) => void;
+  onArchiveTask: (task: any) => void;
 }
 
 export const TaskSearchResults: React.FC<TaskSearchResultsProps> = ({
