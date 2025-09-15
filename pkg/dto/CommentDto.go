@@ -1,7 +1,5 @@
 package dto
 
-import "time"
-
 // CreateCommentDto for creating new comments
 type CreateCommentDto struct {
 	Content string `validate:"required,lte=10000" json:"content"`
@@ -15,13 +13,13 @@ type UpdateCommentDto struct {
 
 // CommentResponseDto for API responses
 type CommentResponseDto struct {
-	ID         int    `json:"id"`
-	Content    string `json:"content"`
-	TaskID     int    `json:"task_id"`
-	CreatedBy  int    `json:"created_by"`
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
-	AuthorName string `json:"author_name"`
+	ID             int    `json:"id"`
+	Content        string `json:"content"`
+	TaskID         int    `json:"task_id"`
+	CreatedBy      int    `json:"created_by"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
+	AuthorName     string `json:"author_name"`
 	AuthorUsername string `json:"author_username"`
 }
 

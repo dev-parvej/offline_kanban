@@ -207,7 +207,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({ taskId }) => {
 
       {/* Comments List */}
       <div className="space-y-4">
-        {comments.length === 0 ? (
+        {comments?.length === 0 ? (
           <div className={`text-center py-8 ${
             isDarkMode ? 'text-gray-500' : 'text-gray-400'
           }`}>
@@ -218,7 +218,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({ taskId }) => {
             <p className="text-xs mt-1">Be the first to comment on this task</p>
           </div>
         ) : (
-          comments.map((comment) => (
+          comments?.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
@@ -302,8 +302,9 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({ taskId }) => {
                   }`}>
                     <div 
                       className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}
-                      dangerouslySetInnerHTML={{ __html: CleanHtml(comment.content) }}
-                    />
+                    >
+                      <CleanHtml html={comment.content} />
+                    </div>
                   </div>
                 )}
               </div>

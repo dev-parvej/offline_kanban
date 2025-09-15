@@ -31,13 +31,13 @@ func (files *Files) Router() {
 	// File upload routes (authenticated users only)
 	fileRouter := files.router.PathPrefix("/files").Subrouter()
 	fileRouter.Use(middleware.Authenticate)
-	
+
 	// Upload image endpoint
 	fileRouter.HandleFunc("/upload/image", files.uploadImage).Methods("POST")
-	
+
 	// Delete image endpoint
 	fileRouter.HandleFunc("/delete/image", files.deleteImage).Methods("DELETE")
-	
+
 	// Serve uploaded files (public access for images)
 	files.router.PathPrefix("/uploads/").Handler(
 		http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))),
@@ -48,7 +48,7 @@ func (files *Files) uploadImage(w http.ResponseWriter, r *http.Request) {
 	// Limit file size to 10MB
 	const maxFileSize = 10 << 20 // 10MB
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize)
-	
+
 	// Parse multipart form
 	if err := r.ParseMultipartForm(maxFileSize); err != nil {
 		util.Res.Writer(w).Status(400).Data("File too large or invalid form data")
@@ -110,37 +110,40 @@ func (files *Files) deleteImage(w http.ResponseWriter, r *http.Request) {
 	type DeleteImageRequest struct {
 		URLs []string `json:"urls"`
 	}
-	
+
 	var req DeleteImageRequest
-	if err := util.ParseJSON(r, &req); err != nil {
+
+	err, _ := util.ValidateRequest(r, &req)
+
+	if err != nil {
 		util.Res.Writer(w).Status(400).Data("Invalid request format")
 		return
 	}
-	
+
 	if len(req.URLs) == 0 {
 		util.Res.Writer(w).Status(400).Data("No image URLs provided")
 		return
 	}
-	
+
 	deletedCount := 0
 	var errors []string
-	
+
 	for _, imageURL := range req.URLs {
 		// Extract filename from URL (e.g., "/uploads/images/filename.jpg" -> "filename.jpg")
 		if !strings.HasPrefix(imageURL, "/uploads/images/") {
 			errors = append(errors, fmt.Sprintf("Invalid image URL: %s", imageURL))
 			continue
 		}
-		
+
 		filename := strings.TrimPrefix(imageURL, "/uploads/images/")
 		if filename == "" {
 			errors = append(errors, fmt.Sprintf("Invalid filename from URL: %s", imageURL))
 			continue
 		}
-		
+
 		// Construct full file path
 		filePath := filepath.Join("./uploads/images", filename)
-		
+
 		// Check if file exists and delete it
 		if _, err := os.Stat(filePath); err != nil {
 			if os.IsNotExist(err) {
@@ -150,24 +153,24 @@ func (files *Files) deleteImage(w http.ResponseWriter, r *http.Request) {
 			errors = append(errors, fmt.Sprintf("Error checking file %s: %v", filename, err))
 			continue
 		}
-		
+
 		if err := os.Remove(filePath); err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to delete %s: %v", filename, err))
 			continue
 		}
-		
+
 		deletedCount++
 	}
-	
+
 	response := map[string]interface{}{
 		"deleted_count": deletedCount,
 		"message":       fmt.Sprintf("Successfully deleted %d images", deletedCount),
 	}
-	
+
 	if len(errors) > 0 {
 		response["errors"] = errors
 	}
-	
+
 	util.Res.Writer(w).Status().Data(response)
 }
 
@@ -175,7 +178,7 @@ func (files *Files) deleteImage(w http.ResponseWriter, r *http.Request) {
 func isValidImageType(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	validTypes := []string{".jpg", ".jpeg", ".png", ".gif", ".webp"}
-	
+
 	for _, validType := range validTypes {
 		if ext == validType {
 			return true

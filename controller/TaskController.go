@@ -191,12 +191,12 @@ func (tasks *Tasks) createTask(w http.ResponseWriter, r *http.Request) {
 	// Create task using service (handles activity tracking)
 	task, err := tasks.taskService.CreateTask(
 		createTaskDto.Title,
-		createTaskDto.Description,
+		*createTaskDto.Description,
 		createTaskDto.ColumnID,
 		userIdInt,
 		createTaskDto.AssignedTo,
 		dueDate,
-		createTaskDto.Priority,
+		*createTaskDto.Priority,
 	)
 
 	if err != nil {

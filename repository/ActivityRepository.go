@@ -1,25 +1,24 @@
 package repository
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/dev-parvej/offline_kanban/pkg/database"
 )
 
 type Activity struct {
-	ID          int       `json:"id"`
-	EntityType  string    `json:"entity_type"`
-	EntityID    int       `json:"entity_id"`
-	Action      string    `json:"action"`
-	FieldName   *string   `json:"field_name"`
-	OldValue    *string   `json:"old_value"`
-	NewValue    *string   `json:"new_value"`
-	UserID      int       `json:"user_id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	UserName    *string   `json:"user_name"`
-	Username    string    `json:"username"`
+	ID         int       `json:"id"`
+	EntityType string    `json:"entity_type"`
+	EntityID   int       `json:"entity_id"`
+	Action     string    `json:"action"`
+	FieldName  *string   `json:"field_name"`
+	OldValue   *string   `json:"old_value"`
+	NewValue   *string   `json:"new_value"`
+	UserID     int       `json:"user_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	UserName   *string   `json:"user_name"`
+	Username   string    `json:"username"`
 }
 
 type ActivityRepository struct {
@@ -39,7 +38,7 @@ func (ar *ActivityRepository) Create(entityType string, entityID int, action str
 		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
-	result, err := ar.db.Connection.Exec(query, entityType, entityID, action, fieldName, oldValue, newValue, userID)
+	result, err := ar.db.Instance().Exec(query, entityType, entityID, action, fieldName, oldValue, newValue, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +63,7 @@ func (ar *ActivityRepository) FindByID(id int) (*Activity, error) {
 		WHERE a.id = ?
 	`
 
-	row := ar.db.Connection.QueryRow(query, id)
+	row := ar.db.Instance().QueryRow(query, id)
 	activity := &Activity{}
 
 	err := row.Scan(
@@ -93,7 +92,7 @@ func (ar *ActivityRepository) GetByEntity(entityType string, entityID int) ([]*A
 		ORDER BY a.created_at DESC
 	`
 
-	rows, err := ar.db.Connection.Query(query, entityType, entityID)
+	rows, err := ar.db.Instance().Query(query, entityType, entityID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func (ar *ActivityRepository) GetRecent(limit, offset int) ([]*Activity, error) 
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := ar.db.Connection.Query(query, limit, offset)
+	rows, err := ar.db.Instance().Query(query, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (ar *ActivityRepository) DeleteOlderThan(days int) error {
 		WHERE created_at < datetime('now', '-' || ? || ' days')
 	`
 
-	_, err := ar.db.Connection.Exec(query, days)
+	_, err := ar.db.Instance().Exec(query, days)
 	return err
 }
 
@@ -184,7 +183,7 @@ func (ar *ActivityRepository) RecordTaskDeleted(taskID, userID int, taskTitle st
 }
 
 // Record task moved to different column
-func (ar *ActivityRepository) RecordTaskMoved(taskID, userID int, oldColumn, newColumn string) error {
+func (ar *ActivityRepository) RecordTaskMoved(taskID, userID int, oldColumn string, newColumn string) error {
 	_, err := ar.Create("task", taskID, "moved", stringPtr("column"), &oldColumn, &newColumn, userID)
 	return err
 }

@@ -164,8 +164,9 @@ export const TaskActivity: React.FC<TaskActivityProps> = ({ taskId }) => {
               }`}>
                 <div 
                   className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}
-                  dangerouslySetInnerHTML={{ __html: CleanHtml(item.content) }}
-                />
+                >
+                  <CleanHtml html={item.content} />
+                  </div>
               </div>
             )}
           </div>

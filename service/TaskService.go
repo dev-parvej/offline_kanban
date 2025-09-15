@@ -27,7 +27,7 @@ func NewTaskService(db *database.Database) *TaskService {
 // CreateTask creates a new task and records the activity
 func (ts *TaskService) CreateTask(title, description string, columnID, userID int, assignedTo *int, dueDate *time.Time, priority string) (*repository.Task, error) {
 	// Create the task
-	task, err := ts.taskRepository.Create(title, description, columnID, userID, assignedTo, dueDate, priority)
+	task, err := ts.taskRepository.Create(title, &description, columnID, userID, assignedTo, dueDate, &priority)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (ts *TaskService) moveTaskToColumn(taskID, newColumnID, userID int) error {
 
 	// Record column move activity
 	if oldColumn != nil && newColumn != nil {
-		err = ts.activityRepository.RecordTaskMoved(taskID, userID, oldColumn.Name, newColumn.Name)
+		err = ts.activityRepository.RecordTaskMoved(taskID, userID, oldColumn.Title, newColumn.Title)
 		if err != nil {
 			fmt.Printf("Failed to record task move activity: %v\n", err)
 		}
@@ -147,10 +147,12 @@ func (ts *TaskService) trackFieldChanges(existing *repository.Task, title, descr
 	}
 
 	// Track description changes
-	if description != nil && *description != existing.Description {
-		oldDesc := existing.Description
-		if oldDesc == "" {
+	if description != nil && *description != *existing.Description {
+		var oldDesc string
+		if existing.Description == nil || *existing.Description == "" {
 			oldDesc = "(empty)"
+		} else {
+			oldDesc = *existing.Description
 		}
 		changes = append(changes, fieldChange{
 			field:    "description",
@@ -160,10 +162,10 @@ func (ts *TaskService) trackFieldChanges(existing *repository.Task, title, descr
 	}
 
 	// Track priority changes
-	if priority != nil && *priority != existing.Priority {
+	if priority != nil && *priority != *existing.Priority {
 		changes = append(changes, fieldChange{
 			field:    "priority",
-			oldValue: existing.Priority,
+			oldValue: *existing.Priority,
 			newValue: *priority,
 		})
 	}
@@ -180,13 +182,13 @@ func (ts *TaskService) trackFieldChanges(existing *repository.Task, title, descr
 
 			if oldAssigneeID > 0 {
 				if user, err := ts.userRepository.FindByID(oldAssigneeID); err == nil {
-					oldAssignee = user.Name
+					oldAssignee = *user.Name
 				}
 			}
 
 			if *assignedTo > 0 {
 				if user, err := ts.userRepository.FindByID(*assignedTo); err == nil {
-					newAssignee = user.Name
+					newAssignee = *user.Name
 				}
 			}
 
